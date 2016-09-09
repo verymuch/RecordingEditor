@@ -1,0 +1,236 @@
+/* recording editor styles */
+.recording-editor {
+    -webkit-user-select: none;
+    min-width: 600px;
+    background-color: #222;
+    border: 2px solid #666;
+    border-radius: 2px;
+}
+.recording-editor .recorder-ctls {
+    float: left;
+    height: 50px;
+    padding: 22.5px;
+    text-align: justify;
+    border-right: 1px solid #000;
+}
+.recording-editor .recorder-ctls.disabled {
+    pointer-events: none;
+}
+.recording-editor .recorder-ctl {
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+    width: 50px;
+    height: 50px;
+    margin: 0 5px;
+    background-color: #666;
+    color: #000;
+    line-height: 50px;
+    text-align: center;
+    border-radius: 2px;
+}
+/* recorder ctl's tooltips style */
+.recording-editor .tooltips {
+    position: absolute;
+    top: 115%;
+    left: 50%;
+    transform: translate(-50%, 0%);
+    font-size: 12px;
+    line-height: 24px;
+    color: #000;
+    background-color: #f3ca3c;
+    border-radius: 2px;
+    z-index: 2;
+}
+.recording-editor .tooltips::before {
+    display: block;
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: calc(50% - 5px);
+    width: 10px;
+    height: 10px;
+    transform: rotate(45deg);
+    background-color: inherit;
+    z-index: -1;
+}
+.recorder-ctl.record-start, 
+.recorder-ctl.audio-play, 
+.recorder-ctl.record-complete {
+    background-color: rgba(64, 203, 144, .9);
+}
+.recorder-ctl.record-start:hover, 
+.recorder-ctl.audio-play:hover, 
+.recorder-ctl.record-complete:hover {
+    background-color: rgba(64, 203, 144, 1);
+}
+.recorder-ctl.record-start.disabled, 
+.recorder-ctl.audio-play.disabled, 
+.recorder-ctl.record-complete.disabled {
+    background-color: rgba(102, 102, 102, .9);
+}
+.recorder-ctl.record-start.disabled:hover, 
+.recorder-ctl.audio-play.disabled:hover, 
+.recorder-ctl.record-complete.disabled:hover {
+    background-color: rgba(102, 102, 102, 1);
+}
+/* 暂停样式需要调整 */
+.recorder-ctl.record-pause, .recorder-ctl.audio-pause {
+    background-color: hsla(30, 100%, 50%, .9);
+}
+.recorder-ctl.record-pause:hover, .recorder-ctl.audio-pause:hover {
+    background-color: hsla(30, 100%, 50%, 1);
+}
+/* audio visualization area styles */
+.recording-editor .audio-visualization-area {
+    overflow: hidden;
+    position: relative;
+    height: 95px;
+}
+.recording-editor .audio-visualization-area.disabled {
+    pointer-events: none;
+}
+.recording-editor .recording-editor .canvases {
+    position: relative;
+}
+.recording-editor .time-line, 
+.recording-editor .audio-wave {
+    display: block;
+    -webkit-text-size-adjust:none;
+    cursor: pointer;
+}
+.recording-editor .selected-area {
+    position: absolute;
+    top: 22px;
+    width: 0px;
+    height: 61px;
+    font-size: 12px;
+    background-color: rgba(64, 203, 144, .5);
+    pointer-events: none;
+}
+.recording-editor .selected-area::before {
+    display: block;
+    font-weight: lighter;
+    position: absolute;
+    top: calc(50% - 5px);
+    color: rgba(255, 255, 255, .9) ;
+}
+.recording-editor .selected-area.left-to-left::before {
+    left: 5px;
+}
+.recording-editor .selected-area.right-to-left::before {
+    right: 5px;
+}
+.recording-editor .selected-area.left-to-right::before {
+    left: 5px;
+}
+.recording-editor .selected-area.right-to-right::before {
+    right: 5px;
+}
+.recording-editor .slider-bar {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 1px;
+    height: 65px;
+    background-color: rgba(64, 203, 144, 1);
+}
+.recording-editor .slider-bar::before,
+.recording-editor .slider-bar::after {
+    display: block;
+    position: absolute;
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 7px; 
+    background-color: rgba(64, 203, 144, 1);
+}
+.slider-bar::before {
+    top: -3px;
+    left: -3px;
+}
+.slider-bar::after {
+    bottom: -3px;
+    left: -3px;
+}
+/* recorded area styles */
+.recorded-area {
+    border-top: 1px solid #000;
+    height: 38px;
+}
+.recorded-area.hide {
+    display: none;
+}
+.recorded-area audio {
+    margin-top: 5px;
+    margin-left: 5px;
+}
+.recorded-area a {
+    float: right;
+    display: inline-block;
+    margin-right: 18px;
+    line-height: 38px;
+    color: rgba(64, 203, 144, .9);
+}
+.recorded-area a:hover {
+    color: rgba(64, 203, 144, 1);
+}
+/* perfect scrollbar specific style in recording editor */
+.recording-editor .ps-scrollbar-x-rail {
+    margin-bottom: 2px; 
+}
+.recording-editor .ps-container > .ps-scrollbar-x-rail:hover > .ps-scrollbar-x, 
+.recording-editor .ps-container > .ps-scrollbar-x-rail:active > .ps-scrollbar-x {
+    height: 6px;
+}
+
+
+/*.audio-visualization-area.exceed-limit:after {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    content: '达到录音时上限3分钟';
+    color: red;
+    text-align: center;
+    font-weight: bold;
+    font-size: 20px;
+    padding-top: 40px;
+    background-color: rgba(255,255,255,.3);
+    animation: exceedLimit 3s 1;
+    animation-fill-mode: forwards;
+}
+@keyframes exceedLimit {
+    0% {
+        text-shadow: 0 0 10px rgb(255,228,43);
+        opacity: 1;
+    }
+    20% {
+        text-shadow: 0 0 0px red;
+        opacity: 1;
+    }
+    40% {
+        text-shadow: 0 0 10px rgb(255,228,43);
+        opacity: 1;
+    }
+    60% {
+        text-shadow: 0 0 0px red;
+        opacity: 1;
+    }
+    80% {
+        text-shadow: 0 0 10px rgb(255,228,43);
+        opacity: 1;
+    }
+    99% {
+        text-shadow: 0 0 0px red;
+        opacity: 0;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        text-shadow: 0 0 10px rgb(255,228,43);
+        transform: scale(0);
+    }
+}

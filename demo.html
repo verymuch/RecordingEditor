@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+	<meta charset="UTF-8">
+	<title>Recording Editor Demo</title>
+	<!-- css -->
+	<link rel="stylesheet" href="js/lib/jQuery/plugins/perfect-scrollbar/css/perfect-scrollbar.min.css">
+	<link rel="stylesheet" href="css/iconfont/iconfont.css">
+	<link rel="stylesheet" href="css/recording-editor.css">
+</head>
+<body>
+	<!-- element for recording editor -->
+	<div class="demo"></div>
+
+	<!-- polyfill -->
+	<!-- to resolve the mistiness of canvas -->
+	<script src="js/lib/hidpi-canvas-polyfill/hidpi-canvas.min.js"></script>
+
+	<!-- lib -->	
+	<script src="js/lib/jQuery/jquery-3.0.0.min.js"></script>
+	<script src="js/lib/jQuery/plugins/perfect-scrollbar/js/perfect-scrollbar.min.js"></script>
+	<script src="js/lib/audio-decode/amrnb.js"></script>	
+
+	<script src="js/RecordingEditor.js"></script>
+
+	<script>
+		var RE = RecordingEditor({
+			$insertElement: $('.demo'),
+			hasLoadedAudio: true,
+			loadedAudioURL: 'audio/star.amr',
+			showRecordedArea: false,
+			defaultWaveStrokeStyle: 'rgba(7, 236, 139, 1)',
+			modifiedWaveStrokeStyle: '#f56b05'
+		});
+	</script>
+</body>
+</html>
