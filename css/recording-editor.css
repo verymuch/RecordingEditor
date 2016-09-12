@@ -1,10 +1,13 @@
 /* recording editor styles */
 .recording-editor {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    right: 10px;
     -webkit-user-select: none;
     min-width: 600px;
     background-color: #222;
-    border: 2px solid #666;
-    border-radius: 2px;
+    border: 10px solid #444;
 }
 .recording-editor .recorder-ctls {
     float: left;
@@ -14,6 +17,7 @@
     border-right: 1px solid #000;
 }
 .recording-editor .recorder-ctls.disabled {
+    opacity: .9;
     pointer-events: none;
 }
 .recording-editor .recorder-ctl {
@@ -34,15 +38,16 @@
     position: absolute;
     top: 115%;
     left: 50%;
-    transform: translate(-50%, 0%);
+    -webkit-transform: translate(-50%, 0%);
+            transform: translate(-50%, 0%);
     font-size: 12px;
     line-height: 24px;
-    color: #000;
-    background-color: #f3ca3c;
+    color: #fff;
+    background-color: rgb(60, 60, 60);
     border-radius: 2px;
     z-index: 2;
 }
-.recording-editor .tooltips::before {
+.recording-editor .tooltips:before {
     display: block;
     content: '';
     position: absolute;
@@ -50,7 +55,8 @@
     left: calc(50% - 5px);
     width: 10px;
     height: 10px;
-    transform: rotate(45deg);
+    -webkit-transform: rotate(45deg);
+            transform: rotate(45deg);
     background-color: inherit;
     z-index: -1;
 }
@@ -88,43 +94,52 @@
     height: 95px;
 }
 .recording-editor .audio-visualization-area.disabled {
+    opacity: .9;
     pointer-events: none;
 }
-.recording-editor .recording-editor .canvases {
+.recording-editor .canvases {
     position: relative;
+    height: 85px;
 }
 .recording-editor .time-line, 
 .recording-editor .audio-wave {
+    position: static;
     display: block;
     -webkit-text-size-adjust:none;
     cursor: pointer;
+}
+.time-line {
+    height: 20px;
+}
+.audio-wave {
+    height: 65px;
 }
 .recording-editor .selected-area {
     position: absolute;
     top: 22px;
     width: 0px;
     height: 61px;
-    font-size: 12px;
     background-color: rgba(64, 203, 144, .5);
     pointer-events: none;
 }
-.recording-editor .selected-area::before {
+.recording-editor .selected-area:before {
     display: block;
+    font-size: 12px !important;
     font-weight: lighter;
     position: absolute;
     top: calc(50% - 5px);
     color: rgba(255, 255, 255, .9) ;
 }
-.recording-editor .selected-area.left-to-left::before {
+.recording-editor .selected-area.left-to-left:before {
     left: 5px;
 }
-.recording-editor .selected-area.right-to-left::before {
+.recording-editor .selected-area.right-to-left:before {
     right: 5px;
 }
-.recording-editor .selected-area.left-to-right::before {
+.recording-editor .selected-area.left-to-right:before {
     left: 5px;
 }
-.recording-editor .selected-area.right-to-right::before {
+.recording-editor .selected-area.right-to-right:before {
     right: 5px;
 }
 .recording-editor .slider-bar {
@@ -135,8 +150,8 @@
     height: 65px;
     background-color: rgba(64, 203, 144, 1);
 }
-.recording-editor .slider-bar::before,
-.recording-editor .slider-bar::after {
+.recording-editor .slider-bar:before,
+.recording-editor .slider-bar:after {
     display: block;
     position: absolute;
     content: '';
@@ -145,11 +160,11 @@
     border-radius: 7px; 
     background-color: rgba(64, 203, 144, 1);
 }
-.slider-bar::before {
+.slider-bar:before {
     top: -3px;
     left: -3px;
 }
-.slider-bar::after {
+.slider-bar:after {
     bottom: -3px;
     left: -3px;
 }
@@ -161,7 +176,8 @@
 .recorded-area.hide {
     display: none;
 }
-.recorded-area audio {
+.recorded-area audio.recorded-audio {
+    pointer-events: none;
     margin-top: 5px;
     margin-left: 5px;
 }
@@ -182,55 +198,5 @@
 .recording-editor .ps-container > .ps-scrollbar-x-rail:hover > .ps-scrollbar-x, 
 .recording-editor .ps-container > .ps-scrollbar-x-rail:active > .ps-scrollbar-x {
     height: 6px;
-}
-
-
-/*.audio-visualization-area.exceed-limit:after {
-    display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    content: '达到录音时上限3分钟';
-    color: red;
-    text-align: center;
-    font-weight: bold;
-    font-size: 20px;
-    padding-top: 40px;
-    background-color: rgba(255,255,255,.3);
-    animation: exceedLimit 3s 1;
-    animation-fill-mode: forwards;
-}
-@keyframes exceedLimit {
-    0% {
-        text-shadow: 0 0 10px rgb(255,228,43);
-        opacity: 1;
-    }
-    20% {
-        text-shadow: 0 0 0px red;
-        opacity: 1;
-    }
-    40% {
-        text-shadow: 0 0 10px rgb(255,228,43);
-        opacity: 1;
-    }
-    60% {
-        text-shadow: 0 0 0px red;
-        opacity: 1;
-    }
-    80% {
-        text-shadow: 0 0 10px rgb(255,228,43);
-        opacity: 1;
-    }
-    99% {
-        text-shadow: 0 0 0px red;
-        opacity: 0;
-        transform: scale(1);
-    }
-    100% {
-        opacity: 0;
-        text-shadow: 0 0 10px rgb(255,228,43);
-        transform: scale(0);
-    }
+    cursor: pointer;
 }

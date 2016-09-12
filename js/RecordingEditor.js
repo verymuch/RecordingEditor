@@ -33,8 +33,8 @@ RecordingEditor.prototype = {
 	defaultTextFillStyle: '#fff',
 	defaultFont: '10px April',
 	defaultLineWidth: 1,
-	defaultWaveStrokeStyle: '#0f0',
-	modifiedWaveStrokeStyle: '#f00',
+	defaultWaveStrokeStyle: '#666',
+	modifiedWaveStrokeStyle: 'rgb(220,0,0)',
 
 	// properties associated with loaded audio
 	hasLoadedAudio: true,
@@ -52,10 +52,37 @@ RecordingEditor.prototype = {
 
 	WORKER_PATH: 'js/lib/recorder/RecorderWorker.js',
 
+  init: function( config ) {
+    var self = this;
+    // extend(merge) the config to default properties
+    $.extend(true, self, config);   
+
+    self.DOMInit();
+
+    self.recorderInit();
+
+    self.recorderCtlsInit();
+    
+    self.tooltipsInit();
+
+    self.audioVisualizationAreaInit();
+
+    self.selectionInit();
+
+    // load amr from server
+    if(self.hasLoadedAudio) {
+      self.amrVisualization();
+    }
+
+    // resize the visualization area when the window is changed
+    self.visualizationAreaResizeCtl();
+
+    return self;
+  },
+
 	// self -> this RecordingEditor
 	Recorder: function(source, cfg, self){
 		var self = self;
-		console.log(self,this);
     var config = cfg || {};
     var bufferLen = config.bufferLen || 4096;
     this.context = source.context;
@@ -129,9 +156,11 @@ RecordingEditor.prototype = {
     this.record = function(positionPercentTemp, selectedPercentTemp, restRightWidthTemp){
       recording = true;
 
-      restRightWidth = restRightWidthTemp;
-      positionPercent = positionPercentTemp;
-      selectedPercent = selectedPercentTemp;
+      restRightWidth = restRightWidthTemp || 0;
+      positionPercent = positionPercentTemp || 0;
+      selectedPercent = selectedPercentTemp || 0;
+
+      console.log(positionPercent, selectedPercent, restRightWidth);
 
       // 点击开始录音时，设定本次录音插入的位置
       worker.postMessage({
@@ -143,6 +172,10 @@ RecordingEditor.prototype = {
 
     this.stop = function(){
       recording = false;
+    }
+
+    this.reset = function(){
+      worker.postMessage({ command: 'reset' });
     }
 
     this.clear = function(){
@@ -197,33 +230,21 @@ RecordingEditor.prototype = {
   	self.currentEvent = eventType;
   },
 
-	init: function( config ) {
-		var self = this;
-		// extend(merge) the config to default properties
-		$.extend(true, self, config);		
+  reset: function(config) {
+    var self = this;
 
-		self.DOMInit();
+    $.extend(true, self, config);   
 
-		self.recorderInit();
+    self.recorderCtlsUninit();
+    self.recorderCtlsInit();
+    
+    self.audioVisualizationAreaReset();
 
-		self.recorderCtlsInit();
-		
-		self.tooltipsInit();
-
-		self.audioVisualizationAreaInit();
-
-		self.selectionInit();
-
-		// load amr from server
-		if(self.hasLoadedAudio) {
-		  self.amrVisualization();
-		}
-
-		// resize the visualization area when the window is changed
-		self.visualizationAreaResizeCtl();
-
-		return self;
-	},
+    // load amr from server
+    if(self.hasLoadedAudio) {
+      self.amrVisualization('reset');
+    }
+  },
 
 	DOMInit: function() {
 		var self = this;
@@ -242,19 +263,19 @@ RecordingEditor.prototype = {
 		self.$recordCtl = $('<div/>')
 			.addClass('recorder-ctl record record-start')
 			.appendTo(self.$recorderCtls)
-			.append($('<i/>').addClass('icon iconfont icon-luyin'));
+			.append($('<i/>').addClass('icon iconfont icon-record'));
 
 		// play ctl
 		self.$playCtl = $('<div/>')
 			.addClass('recorder-ctl audio audio-play')
 			.appendTo(self.$recorderCtls)
-			.append($('<i/>').addClass('icon iconfont icon-bofang'));
+			.append($('<i/>').addClass('icon iconfont icon-play'));
 
 		// complete ctl
 		self.$completeCtl = $('<div/>')
 			.addClass('recorder-ctl record-complete')
 			.appendTo(self.$recorderCtls)
-			.append($('<i/>').addClass('icon iconfont icon-wancheng'));
+			.append($('<i/>').addClass('icon iconfont icon-complete'));
 
 		// audio visualization area 
 		self.$audioVisualizationArea = $('<div/>')
@@ -346,6 +367,14 @@ RecordingEditor.prototype = {
     self.recordCompleteCtlInit();
 	},
 
+  recorderCtlsUninit: function () {
+    var self = this;
+
+    self.recordStartCtlUninit();
+    self.audioPlayCtlUninit();
+    self.recordCompleteCtlUninit();
+  },
+
 	recordStartCtlInit: function() {
 		var self = this;
     
@@ -353,7 +382,7 @@ RecordingEditor.prototype = {
       if($(this).hasClass('record-start')) {
         // change style and content
         $(this).removeClass('record-start').addClass('record-pause').attr('tooltips','停止')
-        	.find('i').removeClass('icon-luyin').addClass('icon-zanting');
+        	.find('i').removeClass('icon-record').addClass('icon-pause');
 
         // limit
         self.$playCtl.addClass('disabled').attr('tooltips', '录制中，无法播放');
@@ -369,7 +398,7 @@ RecordingEditor.prototype = {
         self.hasRecordedAudio = true;
         // change style and content
         $(this).removeClass('record-pause').addClass('record-start').attr('tooltips','录制')             
-        	.find('i').removeClass('icon-zanting').addClass('icon-luyin');
+        	.find('i').removeClass('icon-pause').addClass('icon-record');
 
         // remove limit
         // audio play limit will be removed after the process of recorded audio
@@ -401,7 +430,7 @@ RecordingEditor.prototype = {
         if($(this).hasClass('audio-play')) {
             
             $(this).removeClass('audio-play').addClass('audio-pause').attr('tooltips','停止')
-            	.find('i').removeClass('icon-bofang').addClass('icon-zanting');
+            	.find('i').removeClass('icon-play').addClass('icon-pause');
 
             // limit
             self.$recordCtl.addClass('disabled').attr('tooltips', '播放中，无法录制');
@@ -416,7 +445,7 @@ RecordingEditor.prototype = {
         }else if($(this).hasClass('audio-pause')) {
 
             $(this).removeClass('audio-pause').addClass('audio-play').attr('tooltips','播放')
-            	.find('i').removeClass('icon-zanting').addClass('icon-bofang');
+            	.find('i').removeClass('icon-pause').addClass('icon-play');
 
             self.$recordCtl.removeClass('disabled').attr('tooltips','录制');
             self.recordStartCtlInit();
@@ -713,7 +742,7 @@ RecordingEditor.prototype = {
 
     // 样式变更
     self.$playCtl.removeClass('audio-pause').addClass('audio-play').attr('tooltips','播放')
-    	.find('i').removeClass('icon-zanting').addClass('icon-bofang');
+    	.find('i').removeClass('icon-pause').addClass('icon-play');
 
     //播放停止后，移除disabled限制
     self.$recordCtl.removeClass('disabled').attr('tooltips','录制');
@@ -835,7 +864,7 @@ RecordingEditor.prototype = {
 	/*
 	    @ 加载amr文件，并可视化
 	 */
-	amrVisualization: function() {
+	amrVisualization: function(isReset) {
 		var self = this;
 
     console.log('arm file visualization...');
@@ -854,11 +883,11 @@ RecordingEditor.prototype = {
         var blob = new Blob([buffer], { type: 'audio/wav' });
 
         var fr = new FileReader();
-        source = audioContext.createBufferSource();
+        var source = audioContext.createBufferSource();
         fr.onload = function(e) {
           audioContext.decodeAudioData(e.target.result, function(buffer) {
             console.time('加载音频可视化时间');
-            self.drawExistedOrLoadedAudioWave(buffer);
+            self.drawExistedOrLoadedAudioWave(buffer, isReset);
             console.timeEnd('加载音频可视化时间');
 
             /* 将 buffer 传入解码 AudioBuffer. */
@@ -902,7 +931,7 @@ RecordingEditor.prototype = {
     xhr.onload = function() {
         source = audioContext.createBufferSource();
         audioContext.decodeAudioData(xhr.response, function(buffer) {
-            drawAudioWaveFromExistedAudioBuffer(buffer);
+            self.drawExistedOrLoadedAudioWave(buffer);
             /* 将 buffer 传入解码 AudioBuffer. */
             source.buffer = buffer;
             source.connect(audioContext.destination);
@@ -913,22 +942,48 @@ RecordingEditor.prototype = {
 	},
 
 	/*** audio visualization area ***/
-
 	audioVisualizationAreaInit: function() {
 		var self = this;
-		var initCanvasWidth = self.$audioVisualizationArea[0].scrollWidth;
+    // var initCanvasWidth = self.$audioVisualizationArea[0].scrollWidth;
+    var initCanvasWidth = self.$audioVisualizationArea.width();
 		self.audioVisualizationAreaControl('init', initCanvasWidth);
 	},
 
+  audioVisualizationAreaReset: function() {
+    var self = this;
+    var resetCanvasWidth = self.$audioVisualizationArea.width();
+
+    // reset audio wave canvas's data
+    self.$sliderBar.css('left', self.canvasLeftOffset);
+    self.$audioWave.data({
+      'beginX': self.canvasLeftOffset,
+      'waveWidth': 0
+    });
+
+    // reset the recorded audio
+    self.$recordedAudio.attr('src', '');
+    
+    // reset the recorder
+    recorder.clear();
+
+    self.audioVisualizationAreaControl('reset', resetCanvasWidth);
+
+  },
+
 	audioVisualizationAreaControl: function(psCtl, canvasWidth) {
 		var self = this;
-		var audioVisualizationArea = this.$audioVisualizationArea[0];	
+		var audioVisualizationArea = self.$audioVisualizationArea[0];	
+
 		self.canvasesInit(canvasWidth);
 		if(psCtl == 'init') {
 			Ps.initialize(audioVisualizationArea);
 		}else if(psCtl == 'update') {
 			Ps.update(audioVisualizationArea);
-		}
+		}else if(psCtl == 'reset') {
+      Ps.destroy(audioVisualizationArea);
+      Ps.initialize(audioVisualizationArea);   
+      self.$audioVisualizationArea.scrollLeft(0);   
+    }
 	},
 
 	canvasesInit: function(canvasWidth){
@@ -940,7 +995,6 @@ RecordingEditor.prototype = {
 	timeLineInit: function (canvasWidth) {
 		var self = this;
 		var $timeLineCanvas = self.$timeLine;
-
 		/*
 			notice：the canvas will be clean, if the width is reset
 		*/
@@ -1134,8 +1188,9 @@ RecordingEditor.prototype = {
 		}
 	},
 
-	drawExistedOrLoadedAudioWave: function(audioBuffer) {
+	drawExistedOrLoadedAudioWave: function(audioBuffer, isReset /* 表明组件是否reset,为string类型 */) {
 		var self = this;
+    var isReset = isReset || undefined;
 		var $timeLineCanvas = self.$timeLine;
 		var $audioWaveCanvas = self.$audioWave;
 		var $sliderBar = self.$sliderBar;
@@ -1151,15 +1206,21 @@ RecordingEditor.prototype = {
 		var bufferLen = audioChannelData.length;  	
 
 		var sliceWidth = self.widthPreSecond_px * self.omittedSamplesNum / sampleRate  ;
-
-		var audioVisualizationAreaWidth = self.$audioVisualizationArea[0].scrollWidth;
+    
+    var audioVisualizationAreaWidth = self.$audioVisualizationArea[0].scrollWidth;
+    
 		/* 
 			compute the total width of the canvas
 			if the computed width > audio visualization area width, update area
 		 */
 		var computedCanvasWidth = bufferLen / self.omittedSamplesNum * sliceWidth + beginX + self.canvasRightOffset;
-		if(computedCanvasWidth > audioVisualizationAreaWidth) {
-			self.audioVisualizationAreaControl('update', Math.ceil(computedCanvasWidth));
+		// if reset do this if
+    if(isReset || (computedCanvasWidth > audioVisualizationAreaWidth)) {
+      if(isReset) {
+        self.audioVisualizationAreaControl('reset', Math.ceil(computedCanvasWidth));
+      }else {
+        self.audioVisualizationAreaControl('update', Math.ceil(computedCanvasWidth));
+      }
 		}
 		
 		var canvasCtx = $audioWaveCanvas[0].getContext('2d');
@@ -1313,7 +1374,7 @@ RecordingEditor.prototype = {
               if(direction === 'left') {
                   endX -= step;
               }
-              if(endX > audioWaveWidth + this.canvasLeftOffset || endX < this.canvasLeftOffset) {
+              if(endX > audioWaveWidth + self.canvasLeftOffset || endX < self.canvasLeftOffset) {
                   // 需要清除选区自动变换计时器
                   clearInterval(selectedAreaAutoChangeInterval); 
               }
@@ -1356,22 +1417,22 @@ RecordingEditor.prototype = {
         .removeClass('left-to-right')
         .removeClass('right-to-left')
         .removeClass('right-to-right')
-        .removeClass('iconfont icon-xiangzuoutotheleft')
-        .removeClass('iconfont icon-xiangyouutotheright');
+        .removeClass('icon iconfont icon-to-left')
+        .removeClass('icon iconfont icon-to-right');
 
       // 当选取的宽度不足时，不显示左右箭头       
       if(Math.abs(startX - endX) >= 20) {
         if(direction == 'right') {
           if(startX > endX) {
-              $selectedArea.addClass('left-to-right').addClass('iconfont icon-xiangyouutotheright');
+              $selectedArea.addClass('left-to-right').addClass('icon iconfont icon-to-right');
           }else {
-              $selectedArea.addClass('right-to-right').addClass('iconfont icon-xiangyouutotheright');
+              $selectedArea.addClass('right-to-right').addClass('icon iconfont icon-to-right');
           }
         }else if(direction == 'left'){
           if(startX > endX) {
-              $selectedArea.addClass('left-to-left').addClass('iconfont icon-xiangzuoutotheleft');
+              $selectedArea.addClass('left-to-left').addClass('icon iconfont icon-to-left');
           }else {
-              $selectedArea.addClass('right-to-left').addClass('iconfont icon-xiangzuoutotheleft');
+              $selectedArea.addClass('right-to-left').addClass('icon iconfont icon-to-left');
           }
         }
       }
@@ -1413,8 +1474,8 @@ RecordingEditor.prototype = {
         .removeClass('left-to-right')
         .removeClass('right-to-left')
         .removeClass('right-to-right')
-        .removeClass('iconfont icon-xiangzuoutotheleft')
-        .removeClass('iconfont icon-xiangyouutotheright');
+        .removeClass('icon iconfont icon-to-left')
+        .removeClass('icon iconfont icon-to-right');
 
       //如果没有选区，取消之前的选取
       if(startX === endX || endX === undefined){

@@ -11,7 +11,7 @@ var recLength = 0,
   insertPostion,
   // 点击录音开始后的当前buffer 总长度，直到下一次点击start时，重置为0；
   currentBufferlenth,
-  secondsLimit = 30,
+  secondsLimit = 300,
   bufferLenLimit;
 
 this.onmessage = function(e){
