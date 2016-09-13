@@ -1,13 +1,17 @@
 /* recording editor styles */
 .recording-editor {
     position: fixed;
-    top: 10px;
-    left: 10px;
-    right: 10px;
+    top: 0px;
+    left: 0px;
+    right: 0px;
     -webkit-user-select: none;
     min-width: 600px;
     background-color: #222;
     border: 10px solid #444;
+    z-index: 9999;
+}
+.recording-editor.hide {
+    top: -999px;
 }
 .recording-editor .recorder-ctls {
     float: left;
@@ -73,6 +77,8 @@
 .recorder-ctl.record-start.disabled, 
 .recorder-ctl.audio-play.disabled, 
 .recorder-ctl.record-complete.disabled {
+    opacity: 1; /* 透明度<1 导致tooltips无法正常显示 */
+    pointer-events: all;
     background-color: rgba(102, 102, 102, .9);
 }
 .recorder-ctl.record-start.disabled:hover, 
