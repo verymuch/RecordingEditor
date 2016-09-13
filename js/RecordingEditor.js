@@ -30,11 +30,11 @@ RecordingEditor.prototype = {
 	defaultStrokeStyle:      '#444',
 	defaultHLStrokeStyle:    '#666',
 	defaultTextFillStyle:    '#fff',
-	defaultWaveStrokeStyle:  '#666',
+	defaultWaveStrokeStyle:  '#090',
 	modifiedWaveStrokeStyle: '#d00', // color of inserted or replaced wave
 
 	// properties about loaded audio
-  hasLoadedAudio:    true, 
+  hasLoadedAudio:    false, 
   loadedAudioURL:    'audio/ddd.amr', 
 
   // properties in the process of recording
@@ -331,7 +331,7 @@ RecordingEditor.prototype = {
   initRecordCtl: function() {
     var self = this;
     
-    self.$recordCtl.attr('tooltips','开始录音').click(function() {
+    self.$recordCtl.attr('tooltips','开始录音').removeClass('disbaled').click(function() {
       if($(this).hasClass('record-start')) {
         // change style and content
         $(this).removeClass('record-start').addClass('record-pause').attr('tooltips','暂停录音')
@@ -377,6 +377,8 @@ RecordingEditor.prototype = {
     if( !(self.hasLoadedAudio || self.hasRecordedAudio) ) {
       self.$playCtl.addClass('disabled').attr('tooltips','暂无音频，无法播放');
       return;
+    }else {
+      self.$playCtl.removeClass('disabled');
     }
 
     self.$playCtl.attr('tooltips','开始播放').click(function() {
@@ -415,6 +417,8 @@ RecordingEditor.prototype = {
     if( !(self.hasLoadedAudio || self.hasRecordedAudio) ) {
       self.$completeCtl.addClass('disabled').attr('tooltips','暂无音频，无法保存');
       return;
+    }else {
+      self.$completeCtl.removeClass('disabled');
     }
 
     self.$completeCtl.attr('tooltips','完成录音').click(function() {
@@ -467,7 +471,6 @@ RecordingEditor.prototype = {
       Ps.initialize(audioVisualizationArea);
 
       self.initSelection();
-
       // resize the visualization area when the window is changed
       self.visualizationAreaResizeCtl();
 
@@ -480,7 +483,32 @@ RecordingEditor.prototype = {
     }else if(ctl == 'reset') {
       Ps.destroy(audioVisualizationArea);
       Ps.initialize(audioVisualizationArea);   
-      self.$audioVisualizationArea.scrollLeft(0);   
+
+      // 
+      // reset 之前无法知道已录制视频的长短(即canvas的宽度)，
+      // perfect-scrollbar destroy后，无法重置已有的scrollWidth
+      // 需要出发一次滚动之后，重新计算新的scrollWidth;
+      // 因此在canvases inited后，手动出发滚动条滚动，从而不会影响后续音轨绘制过程中相关width值的计算。
+      // 
+      // trigger the scroll width change by manually scroll the scrollbar
+      self.$audioVisualizationArea.scrollLeft(100);  
+      self.$audioVisualizationArea.scrollLeft(0);  
+
+      self.initSelection();
+      // resize the visualization area when the window is changed
+      self.visualizationAreaResizeCtl();
+
+      // reset sliderbar and selected area
+      self.$sliderBar.css('left', self.canvasLeftOffset);
+      self.$selectedArea.css({
+          'left': 0,
+          'width': 0
+      });
+
+      // load amr from server
+      if(self.hasLoadedAudio) {
+        self.visualizeLoadedAMR();
+      } 
     }
   },
 
@@ -862,7 +890,7 @@ RecordingEditor.prototype = {
   },
 
   // load amr and visualize
-  visualizeLoadedAMR: function(isReset) {
+  visualizeLoadedAMR: function() {
     var self = this;
 
     var xhr = new XMLHttpRequest();
@@ -880,7 +908,7 @@ RecordingEditor.prototype = {
         fr.onload = function(e) {
           audioContext.decodeAudioData(e.target.result, function(buffer) {
             console.time('加载音频可视化时间');
-            self.drawLoadedOrExistedAudioWave(buffer, isReset);
+            self.drawLoadedOrExistedAudioWave(buffer);
             console.timeEnd('加载音频可视化时间');
 
             // put the load buffer into recorder
@@ -1257,7 +1285,7 @@ RecordingEditor.prototype = {
   */
  
 	// ************ TO CHECK *********
-  drawLoadedOrExistedAudioWave: function(audioBuffer, isReset /* 表明组件是否reset,为string类型 */) {
+  drawLoadedOrExistedAudioWave: function(audioBuffer) {
     var self = this;
     var isReset = isReset || undefined;
     var $timeLineCanvas = self.$timeLine;
@@ -1283,13 +1311,8 @@ RecordingEditor.prototype = {
       if the computed width > audio visualization area width, update area
      */
     var computedCanvasWidth = bufferLen / self.omittedSamplesNum * sliceWidth + beginX + self.canvasRightOffset;
-    // if reset do this if
-    if(isReset || (computedCanvasWidth > audioVisualizationAreaWidth)) {
-      if(isReset) {
-        self.audioVisualizationAreaControl('reset', Math.ceil(computedCanvasWidth));
-      }else {
-        self.audioVisualizationAreaControl('update', Math.ceil(computedCanvasWidth));
-      }
+    if((computedCanvasWidth > audioVisualizationAreaWidth)) {
+      self.audioVisualizationAreaControl('update', Math.ceil(computedCanvasWidth));
     }
     
     var canvasCtx = $audioWaveCanvas[0].getContext('2d');
@@ -1474,51 +1497,65 @@ RecordingEditor.prototype = {
     this.addEvents('next');
   },
 
-  /********* reset 相关方法 重写 */
   reset: function(config) {
     var self = this;
 
-    $.extend(true, self, config);   
+    self.resetDefaultProps();
+    // extend must after reset default props 
+    $.extend(true, self, config); 
 
-    self.recorderCtlsUninit();
-    self.initRecorderCtls();
-    
-    self.audioVisualizationAreaReset();
-
-    // load amr from server
-    if(self.hasLoadedAudio) {
-      self.visualizeLoadedAMR('reset');
-    }
+    self.resetRecorder();  
+    self.resetRecorderCtls();
+    self.resetRecordedArea();
+    self.resetAudioVisualizationArea();
   },
 
-  audioVisualizationAreaReset: function() {
+  resetDefaultProps: function() {
     var self = this;
-    var resetCanvasWidth = self.$audioVisualizationArea.width();
 
-    // reset audio wave canvas's data
-    self.$sliderBar.css('left', self.canvasLeftOffset);
-    self.$audioWave.data({
-      'beginX': self.canvasLeftOffset,
-      'waveWidth': 0
-    });
+    self.hasLoadedAudio = false; 
 
-    // reset the recorded audio
-    self.$recordedAudio.attr('src', '');
-    
+    // properties in the process of recording
+    self.hasRecordedAudio =  false;
+    self.isInsertOrReplace = false;
+    self.existedBuffer = '';
+    self.restImgData = '';
+    self.currentEvent = undefined;
+    self.eventsList = [];
+    self.samplesCount = 0;
+  },
+
+  resetRecorder: function() {
     // reset the recorder
     recorder.clear();
-
-    self.audioVisualizationAreaControl('reset', resetCanvasWidth);
   },
 
-  recorderCtlsUninit: function () {
+  resetRecorderCtls: function() {
     var self = this;
+    self.deinitRecorderCtls();
+    self.initRecorderCtls();
+  },
 
+  deinitRecorderCtls: function () {
+    var self = this;
     self.deinitRecordCtl();
     self.deinitPlayCtl();
     self.deinitCompleteCtl();
-  },  
-  /*************************/
+  }, 
+
+  resetAudioVisualizationArea: function() {
+    var self = this;
+    var resetCanvasWidth = self.$audioVisualizationArea.width();
+    self.audioVisualizationAreaControl('reset', resetCanvasWidth);
+  },
+
+  resetRecordedArea: function() {
+    var self = this;
+    // reset the recorded audio
+    self.$recordedAudio.attr('src', '');
+    // remove download anchor
+    self.$recordedArea.find('a').remove();
+  },   
 
   hide: function() {
     var self = this;
