@@ -39,6 +39,7 @@ RecordingEditor.prototype = {
 
   // properties in the process of recording
 	hasRecordedAudio:  false,
+  hasChange:         false,
 	isInsertOrReplace: false,
 	existedBuffer:     '',
   restImgData:       '',
@@ -996,6 +997,8 @@ RecordingEditor.prototype = {
 	startRecording: function() {
 		var self = this;
 
+    self.hasChange = true;
+
     var $audioWave = self.$audioWave;
     var $selectedArea = self.$selectedArea;
     var $sliderBar = self.$sliderBar;
@@ -1209,8 +1212,12 @@ RecordingEditor.prototype = {
 
 	completeRecording: function() {
 		var self = this;
-    // wav to amr file
-    self.wav2amr();
+
+    // if the recording has change do the wav2amr
+    if(self.hasChange) {
+      // wav to amr file
+      self.wav2amr();
+    }
 
     recorder.clear();
 	},
@@ -1520,9 +1527,11 @@ RecordingEditor.prototype = {
     var self = this;
 
     self.hasLoadedAudio = false; 
+    self.loadedAudioURL = '';
 
     // properties in the process of recording
-    self.hasRecordedAudio   =  false;
+    self.hasRecordedAudio   = false;
+    self.hasChange          = false,
     self.isInsertOrReplace  = false;
     self.existedBuffer      = '';
     self.restImgData        = '';
