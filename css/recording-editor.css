@@ -197,9 +197,16 @@
 .recorded-area a:hover {
     color: rgba(64, 203, 144, 1);
 }
+
 /* perfect scrollbar specific style in recording editor */
-.recording-editor .ps-scrollbar-x-rail {
+.recording-editor .ps-container > .ps-scrollbar-x-rail {
     margin-bottom: 2px; 
+    opacity: .5;
+    background-color: transparent !important;
+}
+.recording-editor .ps-container > .ps-scrollbar-x-rail > .ps-scrollbar-x {
+    bottom: 0;
+    height: 6px;
 }
 .recording-editor .ps-container > .ps-scrollbar-x-rail:hover > .ps-scrollbar-x, 
 .recording-editor .ps-container > .ps-scrollbar-x-rail:active > .ps-scrollbar-x {

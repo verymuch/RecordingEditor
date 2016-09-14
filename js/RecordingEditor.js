@@ -48,6 +48,7 @@ RecordingEditor.prototype = {
 
   // worker path for recorder's web worker
   WORKER_PATH: 'js/lib/recorder/RecorderWorker.js',
+  // WORKER_PATH: 'static/js/lib/RecorderWorker.js',
 
   init: function( config ) {
     var self = this;
