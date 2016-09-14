@@ -30,6 +30,9 @@
 			loadedAudioURL: 'audio/star.amr',
 			showRecordedArea: true
 		});
+		RE.on('recordingCompleted', function() {
+			alert(1);
+		});
 	</script>
 </body>
 </html>

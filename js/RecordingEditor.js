@@ -1,51 +1,51 @@
 (function(window, undefined) {
 var document = window.document,
 
-	version = '0.0.1',
+  version = '0.0.1',
 
-	audioContext,
+  audioContext,
 
-	recorder,
+  recorder,
 
-	RecordingEditor = function(config) {
-		return new RecordingEditor.prototype.init(config);
-	};
+  RecordingEditor = function(config) {
+    return new RecordingEditor.prototype.init(config);
+  };
 
 RecordingEditor.prototype = {
-	version: version,
+  version: version,
 
   // set prototype {} need to give the constructor
-	constructor: RecordingEditor,
+  constructor: RecordingEditor,
 
   $insertElement: $('body'),  // insert the rootDOM to body by default
 
-	// default properties about canvas's layout and drawing
-	canvasLeftOffset:      20,  // begin position of time line and audio wave  
-	canvasRightOffset:     30,
-	widthPreSecond_px:     60,
-	pointsNumPreSecond:    10,
-	omittedSamplesNum:     256, // must be 2^n and <= 4096
+  // default properties about canvas's layout and drawing
+  canvasLeftOffset:      20,  // begin position of time line and audio wave  
+  canvasRightOffset:     30,
+  widthPreSecond_px:     60,
+  pointsNumPreSecond:    10,
+  omittedSamplesNum:     256, // must be 2^n and <= 4096
   defaultLineWidth:      1,
   defaultFont:             '10px April',
-	defaultStrokeStyle:      '#444',
-	defaultHLStrokeStyle:    '#666',
-	defaultTextFillStyle:    '#fff',
-	defaultWaveStrokeStyle:  '#090',
-	modifiedWaveStrokeStyle: '#d00', // color of inserted or replaced wave
+  defaultStrokeStyle:      '#444',
+  defaultHLStrokeStyle:    '#666',
+  defaultTextFillStyle:    '#fff',
+  defaultWaveStrokeStyle:  '#090',
+  modifiedWaveStrokeStyle: '#d00', // color of inserted or replaced wave
 
-	// properties about loaded audio
+  // properties about loaded audio
   hasLoadedAudio:    false, 
   loadedAudioURL:    'audio/ddd.amr', 
 
   // properties in the process of recording
-	hasRecordedAudio:  false,
+  hasRecordedAudio:  false,
   hasChange:         false,
-	isInsertOrReplace: false,
-	existedBuffer:     '',
+  isInsertOrReplace: false,
+  existedBuffer:     '',
   restImgData:       '',
-	currentEvent:      undefined,
-	eventsList:        {},
-	samplesCount:      0,  // sample counts of the recorded audio
+  currentEvent:      undefined,
+  eventsList:        {},
+  samplesCount:      0,  // sample counts of the recorded audio
   duration:          0,
 
   // worker path for recorder's web worker
@@ -174,8 +174,8 @@ RecordingEditor.prototype = {
 
   // ********** TO CHECK **********
   // recorder 的内部实现机制
-	// self point to this/RecorderEditor
-	Recorder: function(source, cfg, RecorderEditor){
+  // self point to this/RecorderEditor
+  Recorder: function(source, cfg, RecorderEditor){
     var self = RecorderEditor;
 
     var config = cfg || {};
@@ -427,7 +427,7 @@ RecordingEditor.prototype = {
     }
 
     self.$completeCtl.attr('tooltips','完成录音').click(function() {
-      // self.hide();
+      self.hide();
       self.completeRecording();
     });
   },
@@ -994,8 +994,8 @@ RecordingEditor.prototype = {
   },
 
   // ****** TO CHECK *****
-	startRecording: function() {
-		var self = this;
+  startRecording: function() {
+    var self = this;
 
     self.hasChange = true;
 
@@ -1025,7 +1025,7 @@ RecordingEditor.prototype = {
 
     // change the isInsertOrReplace to true when first insert or replace
     if( restRightWidth != 0 || selectedAreaWidth !=0 ) {
-    	self.isInsertOrReplace = true;
+      self.isInsertOrReplace = true;
     }
 
     // process exist buffer 
@@ -1079,18 +1079,18 @@ RecordingEditor.prototype = {
     
     recorder && recorder.record(positionPercent, selectedPercent, restRightWidth);
     console.log('start recording...');   
-	},
+  },
 
-	pauseRecording: function() {
-		var self = this;
+  pauseRecording: function() {
+    var self = this;
     recorder && recorder.stop();
     self.restImgData = '';
     recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self));
     console.log('stop recording...');
-	},
+  },
 
-	playAudio: function() {
-		var self = this;
+  playAudio: function() {
+    var self = this;
     var $recordedAudio = self.$recordedAudio;
 
     var $audioWave = self.$audioWave;
@@ -1148,10 +1148,10 @@ RecordingEditor.prototype = {
     self.moveSliderBarAsPlayInterval = setInterval(function() {
         self.moveSliderBarAsPlay(playTo, 1);
     }, 1000 / self.widthPreSecond_px); // compute interval by the offset in moveSliderBarAsPlay
-	},
+  },
 
   // offset -> sliber-bar move by offset 
-	moveSliderBarAsPlay: function(playTo, offset /* 移动的幅度 */) {
+  moveSliderBarAsPlay: function(playTo, offset /* 移动的幅度 */) {
     var self = this;
     var $sliderBar = self.$sliderBar;
     var left = parseInt($sliderBar.css('left'));
@@ -1162,11 +1162,11 @@ RecordingEditor.prototype = {
       $sliderBar.css('left', left);
       self.autoScrolled(left, 5);
     }    
-	},
+  },
 
   // has selected area
-	playTimeupdateListener: function(endedTime) {
-		var self = this;
+  playTimeupdateListener: function(endedTime) {
+    var self = this;
     return function listenerHandle(){
       var currentTime = self.$recordedAudio[0].currentTime;
       if(currentTime >= endedTime){
@@ -1175,24 +1175,24 @@ RecordingEditor.prototype = {
         self.$recordedAudio.unbind('timeupdate');
       }
     }
-	},
+  },
 
-	// no selected area
-	playEndedListener: function() {
-		var self = this;
+  // no selected area
+  playEndedListener: function() {
+    var self = this;
     self.resetAfterPlayEnded();
     self.$recordedAudio.unbind('ended');
-	},
+  },
 
   // auto play ended reset
-	resetAfterPlayEnded: function() {
-		var self = this;
+  resetAfterPlayEnded: function() {
+    var self = this;
     var $recordedAudio = self.$recordedAudio;
 
     clearInterval(self.moveSliderBarAsPlayInterval);
 
     self.$playCtl.removeClass('audio-pause').addClass('audio-play').attr('tooltips','开始播放')
-    	.find('i').removeClass('icon-pause').addClass('icon-play');
+      .find('i').removeClass('icon-pause').addClass('icon-play');
 
     self.$recordCtl.removeClass('disabled').attr('tooltips','开始录音');
     self.initRecordCtl();
@@ -1200,18 +1200,18 @@ RecordingEditor.prototype = {
     self.initCompleteCtl();
 
     self.$audioVisualizationArea.removeClass('disabled');    
-	},
+  },
 
-	pauseAudio: function() {
-		var self = this;
+  pauseAudio: function() {
+    var self = this;
 
     self.$recordedAudio[0].pause();  
 
     clearInterval(self.moveSliderBarAsPlayInterval);
-	},
+  },
 
-	completeRecording: function() {
-		var self = this;
+  completeRecording: function() {
+    var self = this;
 
     // if the recording has change do the wav2amr
     if(self.hasChange) {
@@ -1220,18 +1220,20 @@ RecordingEditor.prototype = {
     }
 
     recorder.clear();
-	},
 
-	// wav to amr file after recording completed
-	wav2amr: function() {
-		var self = this;
+    self.trigger('recordingCompleted');
+  },
+
+  // wav to amr file after recording completed
+  wav2amr: function() {
+    var self = this;
     console.log('wav to amr...');
     recorder && recorder.exportWAV(self.wavBlob2Amr.bind(self));
-	}, 
-	
+  }, 
+  
   // convert the exported wav blob to amr
-	wavBlob2Amr: function(blob) {
-		var self = this;
+  wavBlob2Amr: function(blob) {
+    var self = this;
 
     self.handleWAV(blob);
 
@@ -1250,7 +1252,7 @@ RecordingEditor.prototype = {
             self.handleAMR(new Blob([amr], {type: 'datatype/sound'}));
         });
     });
-	},
+  },
 
   handleWAV: function(blob) {
     var self = this;
@@ -1263,20 +1265,20 @@ RecordingEditor.prototype = {
       .attr('download', new Date().toISOString() + '.wav');
   },
 
-	handleAMR: function(blob) {
-		var self = this;
+  handleAMR: function(blob) {
+    var self = this;
 
     // show AMR download anchor
     var url = URL.createObjectURL(blob);
     self.$amrDownloadAnchor = $('<a/>').addClass('amr-download-anchor').appendTo(self.$recordedArea);
     self.$amrDownloadAnchor
-    	.attr('href', url)
-    	.html('Download(amr file)')
-    	.attr('download', new Date().toISOString() + '.amr');
+      .attr('href', url)
+      .html('Download(amr file)')
+      .attr('download', new Date().toISOString() + '.amr');
 
     // upload amr file
     self.uploadAmrFile(blob);
-	},
+  },
 
   uploadAmrFile: function(blob) {
     console.warn('You\'d better give a function named "uploadAmrFile" to RecordingEditor which can upload "blob" to the server!');
@@ -1297,7 +1299,7 @@ RecordingEditor.prototype = {
     },
   */
  
-	// ************ TO CHECK *********
+  // ************ TO CHECK *********
   drawLoadedOrExistedAudioWave: function(audioBuffer) {
     var self = this;
     var isReset = isReset || undefined;
