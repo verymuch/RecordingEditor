@@ -362,6 +362,8 @@ RecordingEditor.prototype = {
           self.initPlayCtl();
           self.$completeCtl.removeClass('disabled').attr('tooltips','完成录音');
           self.initCompleteCtl();
+          // off listener
+          self.off('recordingPaused');
         });
 
         // remove no operation in visualation-area
@@ -1629,26 +1631,6 @@ $.extend(true, RecordingEditor.prototype, {
     };
     reader.readAsArrayBuffer(blob);
   }
-  // ,
-
-  // convertEventsList: function() {
-  //   var self = this;
-
-  //   var samplesCount = self.samplesCount;
-  //   var eventsList = self.eventsList;
-
-  //   var convertedEventsList = {};
-  //   for(var e in eventsList) {
-  //     // 接收的eventsList是双声道数组，所以需要除以2
-  //     // 然后处于采样率 48000 得到秒数，再乘以1000得到毫秒
-  //     var ms_index = e / 2 / 48000 * 1000;
-  //     ms_index = Math.round(ms_index);
-
-  //     convertedEventsList[ms_index] = eventsList[e];
-  //   }
-
-  //   return convertedEventsList;
-  // }
 }); 
 
 
