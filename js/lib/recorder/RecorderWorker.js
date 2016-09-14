@@ -234,15 +234,17 @@ function encodeWAV(samples){
 
 function convertEventsList(eventsList) {
   var convertedEventsList = {};
+
   for(var e in eventsList) {
     if(eventsList[e]) {
       // 接收的eventsList是双声道数组，所以需要除以2
       // 然后处于采样率 48000 得到秒数，再乘以1000得到毫秒
-      var ms_index = e / 2 / 48000 * 1000;
+      var ms_index = e / 2 / sampleRate * 1000;
       ms_index = Math.round(ms_index);
 
       convertedEventsList[ms_index] = eventsList[e];
     }
   }
+  
   return convertedEventsList;
 }
