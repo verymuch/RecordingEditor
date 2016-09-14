@@ -43,8 +43,9 @@ RecordingEditor.prototype = {
 	existedBuffer:     '',
   restImgData:       '',
 	currentEvent:      undefined,
-	eventsList:        [],
+	eventsList:        {},
 	samplesCount:      0,  // sample counts of the recorded audio
+  duration:          0,
 
   // worker path for recorder's web worker
   WORKER_PATH: 'js/lib/recorder/RecorderWorker.js',
@@ -297,13 +298,13 @@ RecordingEditor.prototype = {
             .addClass('disabled')
             .attr('tooltips','超过最大录音限制');
         $('.audio-visualization-area').addClass('exceed-limit');
-
         return;
       }
 
       var blob = e.data.audioBlob;
       var events = e.data.eventsList;
       var len = e.data.len;
+
       self.eventsList = events;
       self.samplesCount = len;
 
@@ -967,7 +968,9 @@ RecordingEditor.prototype = {
     var fr = new FileReader();
     fr.onload = function(e) {
       audioContext.decodeAudioData(e.target.result, function(buffer) {
-        self.existedBuffer = buffer;
+        self.existedBuffer = buffer;        
+        // convert duration to ms
+        self.duration = Math.round(buffer.duration * 1000);
         console.log(buffer);
 
         // 录音暂停处理后/加载完成后也触发一次该事件
@@ -1517,13 +1520,14 @@ RecordingEditor.prototype = {
     self.hasLoadedAudio = false; 
 
     // properties in the process of recording
-    self.hasRecordedAudio =  false;
-    self.isInsertOrReplace = false;
-    self.existedBuffer = '';
-    self.restImgData = '';
-    self.currentEvent = undefined;
-    self.eventsList = [];
-    self.samplesCount = 0;
+    self.hasRecordedAudio   =  false;
+    self.isInsertOrReplace  = false;
+    self.existedBuffer      = '';
+    self.restImgData        = '';
+    self.currentEvent       = undefined;
+    self.eventsList         = {};
+    self.samplesCount       = 0;
+    self.duration           = 0;
   },
 
   resetRecorder: function() {
@@ -1625,7 +1629,28 @@ $.extend(true, RecordingEditor.prototype, {
     };
     reader.readAsArrayBuffer(blob);
   }
+  // ,
+
+  // convertEventsList: function() {
+  //   var self = this;
+
+  //   var samplesCount = self.samplesCount;
+  //   var eventsList = self.eventsList;
+
+  //   var convertedEventsList = {};
+  //   for(var e in eventsList) {
+  //     // 接收的eventsList是双声道数组，所以需要除以2
+  //     // 然后处于采样率 48000 得到秒数，再乘以1000得到毫秒
+  //     var ms_index = e / 2 / 48000 * 1000;
+  //     ms_index = Math.round(ms_index);
+
+  //     convertedEventsList[ms_index] = eventsList[e];
+  //   }
+
+  //   return convertedEventsList;
+  // }
 }); 
+
 
 RecordingEditor.prototype.init.prototype = RecordingEditor.prototype;
 
