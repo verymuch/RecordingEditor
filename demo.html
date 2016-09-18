@@ -12,9 +12,16 @@
 	<!-- element for recording editor -->
 	<div class="demo"></div>
 
+	<!-- 
+	<div class="demo1">
+		<div class="mask"></div>
+	</div> 
+	-->
+
+
 	<!-- polyfill -->
 	<!-- to resolve the mistiness of canvas -->
-	<script src="js/lib/hidpi-canvas-polyfill/hidpi-canvas.min.js"></script>
+	<!-- <script src="js/lib/hidpi-canvas-polyfill/hidpi-canvas.min.js"></script> -->
 
 	<!-- lib -->	
 	<script src="js/lib/jQuery/jquery-3.0.0.min.js"></script>
@@ -26,9 +33,11 @@
 	<script>
 		var RE = RecordingEditor({
 			$insertElement: $('.demo'),
-			hasLoadedAudio: true,
+			hasLoadedAudio: false,
 			loadedAudioURL: 'audio/star.amr',
-			showRecordedArea: true
+			showRecordedArea: true,
+			defaultWaveStrokeStyle: '#666',
+			durationLimit_s: 15
 		});
 		RE.on('recordingCompleted', function() {
 			alert(1);

@@ -33,6 +33,10 @@ RecordingEditor.prototype = {
   defaultWaveStrokeStyle:  '#090',
   modifiedWaveStrokeStyle: '#d00', // color of inserted or replaced wave
 
+  // default properties about duration limit
+  durationLimit_s: 300, // 默认录音时长限制
+  exceedLimit: false,
+
   // properties about loaded audio
   hasLoadedAudio:    false, 
   loadedAudioURL:    'audio/ddd.amr', 
@@ -100,6 +104,14 @@ RecordingEditor.prototype = {
     self.$audioVisualizationArea = $('<div/>')
       .addClass('audio-visualization-area')
       .appendTo(self.$RecordingEditor);
+
+    // recording limit mask layer and count down
+    self.$mask = $('<div/>').addClass('mask')
+      .appendTo(self.$RecordingEditor)
+      .html('还可以录<span class="count-down">10</span>秒');
+
+    self.$maskCountDown = self.$mask.find('span.count-down');
+
 
     // perfect-scroll plugin needs the child nodes of the specific element to be only one
     // so wrap the two canvas( time line canvas and audio wave canvas) in canvases
@@ -178,6 +190,8 @@ RecordingEditor.prototype = {
   Recorder: function(source, cfg, RecorderEditor){
     var self = RecorderEditor;
 
+    var self_recorder = this;
+
     var config = cfg || {};
     var bufferLen = config.bufferLen || 4096;
     this.context = source.context;
@@ -187,7 +201,8 @@ RecordingEditor.prototype = {
     worker.postMessage({
       command: 'init',
       config: {
-        sampleRate: this.context.sampleRate
+        sampleRate: this.context.sampleRate,
+        durationLimit_s: self.durationLimit_s
       }
     });
 
@@ -293,23 +308,40 @@ RecordingEditor.prototype = {
     }
 
     worker.onmessage = function(e){
-      if(e.data.exceedLimit){
-        $('.recorder-ctl.record')
+      switch(e.data.command){
+        case 'durationLimit':
+          self_recorder.handleDurationLimit(e.data);
+          break;
+        case 'exportWAV':
+          self_recorder.handleExportWAV(e.data);
+          break;
+        default:
+          break;
+      }
+    }
+
+    this.handleDurationLimit = function(data) {
+      var restDuration_s = data.restDuration_s;
+      self.$mask.addClass('breath');
+      self.$maskCountDown.html(restDuration_s);
+      if(restDuration_s == 0) {
+        self.exceedLimit = true;
+        self.$recordCtl
             .click().unbind('click')
             .addClass('disabled')
             .attr('tooltips','超过最大录音限制');
-        $('.audio-visualization-area').addClass('exceed-limit');
-        return;
       }
+    }
 
-      var blob = e.data.audioBlob;
-      var events = e.data.eventsList;
-      var len = e.data.len;
+    this.handleExportWAV = function(data) {
+      var blob = data.audioBlob;
+      var events = data.eventsList;
+      var samplesCount = data.samplesCount;
 
       self.eventsList = events;
-      self.samplesCount = len;
+      self.samplesCount = samplesCount;
 
-      console.log('事件列表', events, events.length, len);
+      console.log('eventsList', events, events.length, samplesCount);
       console.log(blob)
 
       currCallback(blob);
@@ -333,6 +365,11 @@ RecordingEditor.prototype = {
 
   initRecordCtl: function() {
     var self = this;
+
+    if(self.exceedLimit) {
+      self.$recordCtl.addClass('disabled').attr('tooltips','超过最大录音限制');
+      return;
+    }
     
     self.$recordCtl.attr('tooltips','开始录音').removeClass('disbaled').click(function() {
       if($(this).hasClass('record-start')) {
@@ -351,6 +388,11 @@ RecordingEditor.prototype = {
 
         self.startRecording();
       }else if($(this).hasClass('record-pause')) {
+        // remove mask if it shows
+        setTimeout(function() {
+          self.$mask.removeClass('breath');          
+        }, 300);
+
         // change style and content
         $(this).removeClass('record-pause').addClass('record-start').attr('tooltips','开始录音')             
           .find('i').removeClass('icon-pause').addClass('icon-record');
@@ -370,7 +412,7 @@ RecordingEditor.prototype = {
         // remove no operation in visualation-area
         self.$audioVisualizationArea.removeClass('disabled');
 
-        console.time('stop record 所需时间为');
+        console.time('pause record 所需时间为');
         self.pauseRecording();
       }
     });
@@ -419,8 +461,8 @@ RecordingEditor.prototype = {
   initCompleteCtl: function() {
     var self = this;
 
-    if( !(self.hasLoadedAudio || self.hasRecordedAudio) ) {
-      self.$completeCtl.addClass('disabled').attr('tooltips','暂无音频，无法保存');
+    if(self.hasChange && self.duration == 0) {
+      self.$completeCtl.addClass('disabled').attr('tooltips','音频长度为零，无法保存');
       return;
     }else {
       self.$completeCtl.removeClass('disabled');

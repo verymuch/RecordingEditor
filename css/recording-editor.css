@@ -213,3 +213,39 @@
     height: 6px;
     cursor: pointer;
 }
+
+/* mask layer styles */
+.recording-editor .mask {
+    display: none;
+    position: absolute;
+    left: 226px;
+    top: 0;
+    /*bottom: 0;*/
+    right: 0;
+    height: 95px;
+    background-color: rgba(255,0,0,.1);
+    color: #fff;
+    font-size: 16px;
+    text-align: center;
+    line-height: 95px;
+    z-index: 3;
+}
+.recording-editor .mask.breath {
+    display: block;
+    animation: mask-breath 1.3s ease infinite;
+}
+@keyframes mask-breath {
+    0% {
+        background-color: rgba(180,0,0,0.1);
+    }
+    50% {
+        background-color: rgba(180,0,0,.5);
+    }
+    100% {
+        background-color: rgba(180,0,0,0.1);
+    }
+}
+.recording-editor .mask .count-down {
+    display: inline-block;
+    padding: 0 5px;
+}

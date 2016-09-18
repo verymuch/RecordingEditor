@@ -11,7 +11,8 @@ var recLength = 0,
   insertPostion,
   // 点击录音开始后的当前buffer 总长度，直到下一次点击start时，重置为0；
   currentBufferlenth,
-  secondsLimit = 300,
+  durationLimit_s = 300, // 默认录音时长限制
+  currentDuration_s = 0,
   bufferLenLimit;
 
 this.onmessage = function(e){
@@ -37,12 +38,15 @@ this.onmessage = function(e){
     case 'clear':
       clear();
       break;
+    default:
+      break;
   }
 };
 
 function init(config){
   sampleRate = config.sampleRate;
-  bufferLenLimit = secondsLimit * sampleRate * 2 ;
+  durationLimit_s = config.durationLimit_s;
+  bufferLenLimit = durationLimit_s * sampleRate * 2 ;
 }
 
 function loadAudio(inputBuffer){
@@ -81,15 +85,6 @@ function insert(positionPercent, selectedPercent) {
 
 
 function record(inputBuffer, currentEvent){
-  if(recBuffers.length >= bufferLenLimit) {
-    var exceedLimit = true;
-    var data = {
-      'exceedLimit': exceedLimit
-    };
-    this.postMessage(data);
-    return ;
-  }
-
   var bufferL = inputBuffer[0];
   var bufferR = inputBuffer[1];
   var interleaved = interleave(bufferL, bufferR);
@@ -113,13 +108,21 @@ function record(inputBuffer, currentEvent){
   Array.prototype.splice.apply(recBuffers, interleaved);
   Array.prototype.splice.apply(eventsList, tempEventsList);
 
-
-  // recBuffers.push(interleaved);
-
-  // recBuffers = recBuffers.concat(interleaved);
+  var currentDuration_s = Math.floor(recBuffers.length / 2 / sampleRate);
+  var restDuration_s = durationLimit_s - currentDuration_s
   
-  // recBuffers.push(interleaved);
-  // recLength += interleaved.length;
+  if(restDuration_s <= 10) {
+    var data = {
+      command: 'durationLimit',
+      restDuration_s: restDuration_s
+    }
+    this.postMessage(data);
+    if(restDuration_s <= 0) {
+      // 清除多录制的少量音频数据
+      recBuffers.splice(bufferLenLimit, recBuffers.length - bufferLenLimit )
+      return;      
+    }
+  }
 }
 
 function exportWAV(type){
@@ -130,9 +133,10 @@ function exportWAV(type){
   var audioBlob = new Blob([dataview], { type: type });
 
   var data = {
+    command: 'exportWAV',
     audioBlob: audioBlob,
     eventsList: convertEventsList(eventsList),
-    len: recBuffers.length
+    samplesCount: recBuffers.length
   }
 
   // 返回事件列表
