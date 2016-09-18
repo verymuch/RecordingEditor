@@ -35,7 +35,8 @@ RecordingEditor.prototype = {
 
   // default properties about duration limit
   durationLimit_s: 300, // 默认录音时长限制
-  exceedLimit: false,
+  hasExceedLimit_temp: '',
+  hasExceedLimit: false,
 
   // properties about loaded audio
   hasLoadedAudio:    false, 
@@ -325,11 +326,11 @@ RecordingEditor.prototype = {
       self.$mask.addClass('breath');
       self.$maskCountDown.html(restDuration_s);
       if(restDuration_s == 0) {
-        self.exceedLimit = true;
+        self.hasExceedLimit = true;
         self.$recordCtl
-            .click().unbind('click')
-            .addClass('disabled')
-            .attr('tooltips','超过最大录音限制');
+          .click().unbind('click')
+          .addClass('disabled')
+          .attr('tooltips','超过最大录音限制');
       }
     }
 
@@ -366,12 +367,14 @@ RecordingEditor.prototype = {
   initRecordCtl: function() {
     var self = this;
 
-    if(self.exceedLimit) {
+    if(self.hasExceedLimit) {
       self.$recordCtl.addClass('disabled').attr('tooltips','超过最大录音限制');
       return;
     }
-    
-    self.$recordCtl.attr('tooltips','开始录音').removeClass('disbaled').click(function() {
+    console.log('init recorder ctl')
+    self.$recordCtl.attr('tooltips','开始录音').removeClass('disabled').click(function() {
+      self.hasExceedLimit_temp = '';
+
       if($(this).hasClass('record-start')) {
         // change style and content
         $(this).removeClass('record-start').addClass('record-pause').attr('tooltips','暂停录音')
@@ -836,7 +839,22 @@ RecordingEditor.prototype = {
 
       //如果没有选区，取消之前的选取
       if(startX === endX || endX === undefined){
-          cancelSelectedArea();
+        cancelSelectedArea();
+        // 选区取消未做其他处理时，还原exceedLimit
+        if(self.hasExceedLimit_temp == true) {
+          self.hasExceedLimit_temp = '';
+          self.hasExceedLimit = true;
+          self.deinitRecordCtl();
+          self.initRecordCtl();
+        }
+      }else {
+        // 录音达到限制，并存在选区时，解除限制
+        if(self.hasExceedLimit == true){
+          self.hasExceedLimit_temp = true;
+          self.hasExceedLimit = false;
+          self.deinitRecordCtl();
+          self.initRecordCtl();
+        }
       }
       showSliderBar(startX, endX);
     }
