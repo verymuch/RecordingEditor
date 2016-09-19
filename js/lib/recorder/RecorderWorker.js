@@ -119,7 +119,7 @@ function record(inputBuffer, currentEvent){
     this.postMessage(data);
     if(restDuration_s <= 0) {
       // 清除多录制的少量音频数据
-      // recBuffers.splice(bufferLenLimit, recBuffers.length - bufferLenLimit )
+      recBuffers.splice(bufferLenLimit, recBuffers.length - bufferLenLimit )
       return;      
     }
   }

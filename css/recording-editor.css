@@ -7,7 +7,7 @@
     -webkit-user-select: none;
     min-width: 600px;
     background-color: #222;
-    border: 10px solid #444;
+    /*border: 10px solid #444;*/
     z-index: 9999;
 }
 .recording-editor.hide {
@@ -177,7 +177,7 @@
 /* recorded area styles */
 .recorded-area {
     border-top: 1px solid #000;
-    height: 38px;
+    height: 45px;
 }
 .recorded-area.hide {
     display: none;
@@ -223,7 +223,7 @@
     /*bottom: 0;*/
     right: 0;
     height: 95px;
-    background-color: rgba(255,0,0,.1);
+    background-color: rgba(255,215,0,.1);
     color: #fff;
     font-size: 16px;
     text-align: center;
@@ -232,17 +232,17 @@
 }
 .recording-editor .mask.breath {
     display: block;
-    animation: mask-breath 1.3s ease infinite;
+    animation: mask-breath 1.3s ease-in-out infinite;
 }
 @keyframes mask-breath {
     0% {
-        background-color: rgba(180,0,0,0.1);
+        background-color: rgba(255,215,0,.1);
     }
     50% {
-        background-color: rgba(180,0,0,.5);
+        background-color: rgba(255,215,0,.5);
     }
     100% {
-        background-color: rgba(180,0,0,0.1);
+        background-color: rgba(255,215,0,.1);
     }
 }
 .recording-editor .mask .count-down {

@@ -327,6 +327,34 @@ RecordingEditor.prototype = {
       self.$maskCountDown.html(restDuration_s);
       if(restDuration_s == 0) {
         self.hasExceedLimit = true;
+
+        // clear exceeded audio wave
+        var audioWaveWidthLimit = self.widthPreSecond_px * self.durationLimit_s
+        var audioWaveWidth = self.$audioWave.data('waveWidth');
+        // exceeded width
+        var dValue = audioWaveWidth - audioWaveWidthLimit;
+
+        if(dValue > 0) {
+          var $audioWaveCanvas = self.$audioWave;
+          var audioWaveCtx = $audioWaveCanvas[0].getContext('2d');
+          var canvasHeight = $audioWaveCanvas.height(); 
+          var halfHeight = canvasHeight / 2;
+
+          audioWaveCtx.clearRect(audioWaveWidthLimit + self.canvasLeftOffset, 1, dValue, canvasHeight - 2);
+          // middle line need to be redraw
+          audioWaveCtx.strokeStyle = self.defaultHLStrokeStyle;
+          audioWaveCtx.lineWidth = self.defaultLineWidth;
+          audioWaveCtx.beginPath();
+          audioWaveCtx.moveTo(audioWaveWidthLimit + self.canvasLeftOffset, halfHeight);
+          audioWaveCtx.lineTo(audioWaveWidthLimit + self.canvasLeftOffset + dValue, halfHeight);
+          audioWaveCtx.stroke();
+
+          $audioWaveCanvas.data('waveWidth', audioWaveWidthLimit);
+          $audioWaveCanvas.data('beginX', $audioWaveCanvas.data('beginX') - dValue);
+          self.$sliderBar.css('left', parseInt(self.$sliderBar.css('left')) - dValue); 
+        }
+
+        // change record ctl
         self.$recordCtl
           .click().unbind('click')
           .addClass('disabled')
@@ -534,7 +562,6 @@ RecordingEditor.prototype = {
       Ps.destroy(audioVisualizationArea);
       Ps.initialize(audioVisualizationArea);   
 
-      // 
       // reset 之前无法知道已录制视频的长短(即canvas的宽度)，
       // perfect-scrollbar destroy后，无法重置已有的scrollWidth
       // 需要出发一次滚动之后，重新计算新的scrollWidth;
