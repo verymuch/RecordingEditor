@@ -7,8 +7,7 @@
     -webkit-user-select: none;
     min-width: 600px;
     background-color: #222;
-    /*border: 10px solid #444;*/
-    z-index: 9999;
+    z-index: 999;
 }
 .recording-editor.hide {
     top: -999px;
@@ -32,11 +31,15 @@
     width: 50px;
     height: 50px;
     margin: 0 5px;
-    background-color: #666;
-    color: #000;
+    background-color: rgba(68, 68, 68, 1);
+    color: #fff;
+    font-size: 26px;
     line-height: 50px;
     text-align: center;
     border-radius: 2px;
+}
+.recording-editor .recorder-ctl.disabled {
+    color: rgba(136, 136, 136, 1);
 }
 /* recorder ctl's tooltips style */
 .recording-editor .tooltips {
@@ -162,7 +165,7 @@
     font-size: 12px !important;
     font-weight: lighter;
     position: absolute;
-    top: calc(50% - 5px);
+    top: calc(50% - 6px);
     color: rgba(255, 255, 255, .9) ;
 }
 .recording-editor .selected-area.left-to-left:before {

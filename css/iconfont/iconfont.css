@@ -8,16 +8,16 @@
 }
 .recording-editor .icon.iconfont:before {
   font-family: "recording-editor-iconfont" !important;
-  font-size: 16px;
+  font-size: 20px;
   font-style: normal;
   -webkit-font-smoothing: antialiased;
   -webkit-text-stroke-width: 0.2px;
   -moz-osx-font-smoothing: grayscale;
 }
-.recording-editor .icon-record:before   { content: "\e603"; }
+.recording-editor .icon-mic-1:before   { content: "\e603"; }
 .recording-editor .icon-play:before     { content: "\e601"; }
 .recording-editor .icon-pause:before    { content: "\e600"; }
-.recording-editor .icon-complete:before { content: "\e602"; }
+.recording-editor .icon-ok:before { content: "\e602"; }
 
 .recording-editor .icon-to-left:before  { content: "\e604"; }
 .recording-editor .icon-to-right:before { content: "\e605"; }

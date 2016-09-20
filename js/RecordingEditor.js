@@ -1,4 +1,6 @@
 // import bus from 'bus'
+// import VueDialog from 'component/vue-dialog/main.js'
+
 
 (function(window, undefined) {
 var document = window.document,
@@ -107,7 +109,7 @@ RecordingEditor.prototype = {
     self.$recordCtl = $('<div/>')
       .addClass('recorder-ctl record record-start')
       .appendTo(self.$recorderCtls)
-      .append($('<i/>').addClass('icon iconfont icon-record'));
+      .append($('<i/>').addClass('icon iconfont icon-mic-1'));
 
     // play ctl
     self.$playCtl = $('<div/>')
@@ -119,7 +121,7 @@ RecordingEditor.prototype = {
     self.$completeCtl = $('<div/>')
       .addClass('recorder-ctl record-complete')
       .appendTo(self.$recorderCtls)
-      .append($('<i/>').addClass('icon iconfont icon-complete'));
+      .append($('<i/>').addClass('icon iconfont icon-ok'));
 
     // no microphone warning
     self.$noMicrophone = $('<div/>')
@@ -433,7 +435,7 @@ RecordingEditor.prototype = {
       if($(this).hasClass('record-start')) {
         // change style and content
         $(this).removeClass('record-start').addClass('record-pause').attr('tooltips','暂停录音')
-          .find('i').removeClass('icon-record').addClass('icon-pause');
+          .find('i').removeClass('icon-mic-1').addClass('icon-pause');
 
         // limit
         self.$playCtl.addClass('disabled').attr('tooltips', '录制中，无法播放');
@@ -453,7 +455,7 @@ RecordingEditor.prototype = {
 
         // change style and content
         $(this).removeClass('record-pause').addClass('record-start').attr('tooltips','开始录音')             
-          .find('i').removeClass('icon-pause').addClass('icon-record');
+          .find('i').removeClass('icon-pause').addClass('icon-mic-1');
 
         // remove limit
         // 暂停处理完成后
@@ -527,8 +529,19 @@ RecordingEditor.prototype = {
     }
 
     self.$completeCtl.attr('tooltips','完成录音').click(function() {
-      self.hide();
-      self.completeRecording();
+      // VueDialog.confirm(
+      //   '是否完成录音？', 
+      //   (result) => {
+      //     if(result) {
+            self.hide();
+            self.completeRecording();
+      //     }
+      //   }, 
+      //   {
+      //     posRelativeTo: self.$completeCtl[0],
+      //     pos: 'bottom'
+      //   }
+      // )
     });
   },
 
@@ -884,12 +897,12 @@ RecordingEditor.prototype = {
       clearInterval(selectedAreaAutoChangeInterval);
 
       // 清空选区自动变更时添加的样式
-      $selectedArea.removeClass('left-to-left')
-        .removeClass('left-to-right')
-        .removeClass('right-to-left')
-        .removeClass('right-to-right')
-        .removeClass('icon iconfont icon-to-left')
-        .removeClass('icon iconfont icon-to-right');
+      // $selectedArea.removeClass('left-to-left')
+      //   .removeClass('left-to-right')
+      //   .removeClass('right-to-left')
+      //   .removeClass('right-to-right')
+      //   .removeClass('icon iconfont icon-to-left')
+      //   .removeClass('icon iconfont icon-to-right');
 
       //如果没有选区，取消之前的选取
       if(startX === endX || endX === undefined){
