@@ -14,6 +14,7 @@
     top: -999px;
 }
 .recording-editor .recorder-ctls {
+    position: relative;
     float: left;
     height: 50px;
     padding: 22.5px;
@@ -92,6 +93,34 @@
 }
 .recorder-ctl.record-pause:hover, .recorder-ctl.audio-pause:hover {
     background-color: hsla(30, 100%, 50%, 1);
+}
+/* no microphone warning style */
+.recording-editor .no-microphone {
+    display: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    color: #fff;
+    background-color: rgba(255, 165, 0, .2);
+    z-index: 3;
+}
+.recording-editor .no-microphone.show {
+    display: block;
+}
+.recording-editor .no-microphone span {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    max-height: 60px;
+    padding: 15px;
+    line-height: 1.4;
+    text-align: center;
+    border-radius: 3px;
+    background-color: rgba(255, 165, 0, 1);
 }
 /* audio visualization area styles */
 .recording-editor .audio-visualization-area {
@@ -214,8 +243,8 @@
     cursor: pointer;
 }
 
-/* mask layer styles */
-.recording-editor .mask {
+/* duration limit layer styles */
+.recording-editor .duration-limit {
     display: none;
     position: absolute;
     left: 226px;
@@ -223,29 +252,29 @@
     /*bottom: 0;*/
     right: 0;
     height: 95px;
-    background-color: rgba(255,215,0,.1);
+    background-color: rgba(255, 165, 0, .2);
     color: #fff;
     font-size: 16px;
     text-align: center;
     line-height: 95px;
     z-index: 3;
 }
-.recording-editor .mask.breath {
+.recording-editor .duration-limit.breath {
     display: block;
-    animation: mask-breath 1.3s ease-in-out infinite;
+    animation: duration-limit-breath 1.3s ease-in-out infinite;
 }
-@keyframes mask-breath {
+@keyframes duration-limit-breath {
     0% {
-        background-color: rgba(255,215,0,.1);
+        background-color: rgba(255, 165, 0, .2);
     }
     50% {
-        background-color: rgba(255,215,0,.5);
+        background-color: rgba(255, 165, 0, .3);
     }
     100% {
-        background-color: rgba(255,215,0,.1);
+        background-color: rgba(255, 165, 0, .2);
     }
 }
-.recording-editor .mask .count-down {
+.recording-editor .duration-limit .count-down {
     display: inline-block;
     padding: 0 5px;
 }

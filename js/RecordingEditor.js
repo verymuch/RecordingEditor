@@ -1,3 +1,5 @@
+// import bus from 'bus'
+
 (function(window, undefined) {
 var document = window.document,
 
@@ -10,6 +12,24 @@ var document = window.document,
   RecordingEditor = function(config) {
     return new RecordingEditor.prototype.init(config);
   };
+
+
+RecordingEditor.checkMicrophone = function(callback) {
+  
+  // getUserMedia
+  navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+
+  navigator.getUserMedia({
+      audio: true
+  }, ()=>{
+    callback && callback(true)
+  }, function(e){
+    console.warn('No live audio input:' + e);
+    callback && callback(false)
+  });
+}
+
+// bus.$on('check-microphone', RecordingEditor.checkMicrophone);
 
 RecordingEditor.prototype = {
   version: version,
@@ -101,17 +121,23 @@ RecordingEditor.prototype = {
       .appendTo(self.$recorderCtls)
       .append($('<i/>').addClass('icon iconfont icon-complete'));
 
+    // no microphone warning
+    self.$noMicrophone = $('<div/>')
+      .addClass('no-microphone')
+      .appendTo(self.$RecordingEditor)
+      .html('<span>无麦克风或麦克风被禁止<br>请启动麦克风并刷新重试</span>');
+
     // audio visualization area 
     self.$audioVisualizationArea = $('<div/>')
       .addClass('audio-visualization-area')
       .appendTo(self.$RecordingEditor);
 
     // recording limit mask layer and count down
-    self.$mask = $('<div/>').addClass('mask')
+    self.$durationLimit = $('<div/>').addClass('duration-limit')
       .appendTo(self.$RecordingEditor)
       .html('还可以录<span class="count-down">10</span>秒');
 
-    self.$maskCountDown = self.$mask.find('span.count-down');
+    self.$durationLimitCountDown = self.$durationLimit.find('span.count-down');
 
 
     // perfect-scroll plugin needs the child nodes of the specific element to be only one
@@ -148,28 +174,29 @@ RecordingEditor.prototype = {
     var self = this;
     // audiocontext init, userMedia init
     try {
-        // shim
-        window.AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+      // shim
+      window.AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
 
-        // getUserMedia
-        navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+      // getUserMedia
+      navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
 
-        window.URL = window.URL || window.webkitURL || window.mozURL;
+      window.URL = window.URL || window.webkitURL || window.mozURL;
 
-        // 创建好音频上下文
-        audioContext = new AudioContext();
+      // 创建好音频上下文
+      audioContext = new AudioContext();
 
-        console.log('AudioContext set up!');
-        console.log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'supported' : 'not supported') + '!');
+      console.log('AudioContext set up!');
+      console.log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'supported' : 'not supported') + '!');
 
     }catch (e) {
-        console.warn('Web audio API is not supported in this browser');
+      console.warn('Web audio API is not supported in this browser');
     }
 
     navigator.getUserMedia({
-        audio: true
+      audio: true
     }, self.initUserMedia.bind(self), function(e){
-        console.warn('No live audio input:' + e);
+      console.warn('No live audio input:' + e);
+      self.$noMicrophone.addClass('show');
     });
   },
 
@@ -323,8 +350,8 @@ RecordingEditor.prototype = {
 
     this.handleDurationLimit = function(data) {
       var restDuration_s = data.restDuration_s;
-      self.$mask.addClass('breath');
-      self.$maskCountDown.html(restDuration_s);
+      self.$durationLimit.addClass('breath');
+      self.$durationLimitCountDown.html(restDuration_s);
       if(restDuration_s == 0) {
         self.hasExceedLimit = true;
 
@@ -421,7 +448,7 @@ RecordingEditor.prototype = {
       }else if($(this).hasClass('record-pause')) {
         // remove mask if it shows
         setTimeout(function() {
-          self.$mask.removeClass('breath');          
+          self.$durationLimit.removeClass('breath');          
         }, 300);
 
         // change style and content
