@@ -52,8 +52,8 @@ RecordingEditor.prototype = {
   defaultStrokeStyle:      '#444',
   defaultHLStrokeStyle:    '#666',
   defaultTextFillStyle:    '#fff',
-  defaultWaveStrokeStyle:  '#090',
-  modifiedWaveStrokeStyle: '#d00', // color of inserted or replaced wave
+  defaultWaveStrokeStyle:  '#40cb90',
+  modifiedWaveStrokeStyle: '#e74c3c', // color of inserted or replaced wave
 
   // default properties about duration limit
   durationLimit_s: 300, // 默认录音时长限制

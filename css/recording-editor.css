@@ -22,6 +22,7 @@
 }
 .recording-editor .recorder-ctls.disabled {
     opacity: .9;
+    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=90)";
     pointer-events: none;
 }
 .recording-editor .recorder-ctl {
@@ -31,15 +32,12 @@
     width: 50px;
     height: 50px;
     margin: 0 5px;
-    background-color: rgba(68, 68, 68, 1);
-    color: #fff;
-    font-size: 26px;
+    color: #eee;
+    /*color: #000;*/
+    font-size: 22px;
     line-height: 50px;
     text-align: center;
     border-radius: 2px;
-}
-.recording-editor .recorder-ctl.disabled {
-    color: rgba(136, 136, 136, 1);
 }
 /* recorder ctl's tooltips style */
 .recording-editor .tooltips {
@@ -71,31 +69,29 @@
 .recorder-ctl.record-start, 
 .recorder-ctl.audio-play, 
 .recorder-ctl.record-complete {
-    background-color: rgba(64, 203, 144, .9);
+    background-color: rgba(64, 203, 144, 1);
 }
 .recorder-ctl.record-start:hover, 
 .recorder-ctl.audio-play:hover, 
 .recorder-ctl.record-complete:hover {
-    background-color: rgba(64, 203, 144, 1);
+    background-color: rgba(104, 214, 167, 1);
 }
 .recorder-ctl.record-start.disabled, 
 .recorder-ctl.audio-play.disabled, 
 .recorder-ctl.record-complete.disabled {
-    opacity: 1; /* 透明度<1 导致tooltips无法正常显示 */
+    /*opacity: .5;*/
+    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=100)"; /* 透明度<1 导致tooltips无法正常显示 */
     pointer-events: all;
-    background-color: rgba(102, 102, 102, .9);
-}
-.recorder-ctl.record-start.disabled:hover, 
-.recorder-ctl.audio-play.disabled:hover, 
-.recorder-ctl.record-complete.disabled:hover {
-    background-color: rgba(102, 102, 102, 1);
+    color: rgba(136, 136, 136, 1);
+    background-color: rgba(68, 68, 68, 1);
+    cursor: auto;
 }
 /* 暂停样式需要调整 */
 .recorder-ctl.record-pause, .recorder-ctl.audio-pause {
-    background-color: hsla(30, 100%, 50%, .9);
+    background-color: rgba(231, 76, 60, 1);
 }
 .recorder-ctl.record-pause:hover, .recorder-ctl.audio-pause:hover {
-    background-color: hsla(30, 100%, 50%, 1);
+    background-color: rgba(231, 76, 60, .77);
 }
 /* no microphone warning style */
 .recording-editor .no-microphone {
@@ -106,7 +102,8 @@
     bottom: 0;
     left: 0;
     color: #fff;
-    background-color: rgba(255, 165, 0, .2);
+    background-color: rgba(231, 76, 60, .2);
+    font-size: 16px;
     z-index: 3;
 }
 .recording-editor .no-microphone.show {
@@ -116,14 +113,15 @@
     position: absolute;
     left: 50%;
     top: 50%;
-    transform: translate(-50%, -50%);
+    -webkit-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
     width: 200px;
     max-height: 60px;
     padding: 15px;
     line-height: 1.4;
     text-align: center;
     border-radius: 3px;
-    background-color: rgba(255, 165, 0, 1);
+    background-color: rgba(231, 76, 60, 1);
 }
 /* audio visualization area styles */
 .recording-editor .audio-visualization-area {
@@ -133,6 +131,7 @@
 }
 .recording-editor .audio-visualization-area.disabled {
     opacity: .9;
+    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=90)";
     pointer-events: none;
 }
 .recording-editor .canvases {
@@ -233,7 +232,8 @@
 /* perfect scrollbar specific style in recording editor */
 .recording-editor .ps-container > .ps-scrollbar-x-rail {
     margin-bottom: 2px; 
-    opacity: .5;
+    opacity: .5; 
+    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=50)";
     background-color: transparent !important;
 }
 .recording-editor .ps-container > .ps-scrollbar-x-rail > .ps-scrollbar-x {
@@ -255,26 +255,38 @@
     /*bottom: 0;*/
     right: 0;
     height: 95px;
-    background-color: rgba(255, 165, 0, .2);
+    background-color: rgba(231, 76, 60, .2);
     color: #fff;
-    font-size: 16px;
+    font-size: 14px;
     text-align: center;
     line-height: 95px;
     z-index: 3;
 }
 .recording-editor .duration-limit.breath {
     display: block;
-    animation: duration-limit-breath 1.3s ease-in-out infinite;
+    -webkit-animation: duration-limit-breath 1.3s ease-in-out infinite;
+            animation: duration-limit-breath 1.3s ease-in-out infinite;
+}
+@-webkit-keyframes duration-limit-breath {
+    0% {
+        background-color: rgba(231, 76, 60, .2);
+    }
+    50% {
+        background-color: rgba(231, 76, 60, .3);
+    }
+    100% {
+        background-color: rgba(231, 76, 60, .2);
+    }
 }
 @keyframes duration-limit-breath {
     0% {
-        background-color: rgba(255, 165, 0, .2);
+        background-color: rgba(231, 76, 60, .2);
     }
     50% {
-        background-color: rgba(255, 165, 0, .3);
+        background-color: rgba(231, 76, 60, .3);
     }
     100% {
-        background-color: rgba(255, 165, 0, .2);
+        background-color: rgba(231, 76, 60, .2);
     }
 }
 .recording-editor .duration-limit .count-down {
