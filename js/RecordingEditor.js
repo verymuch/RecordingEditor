@@ -717,17 +717,16 @@ RecordingEditor.prototype = {
     audioWaveCtx.stroke();
   },
 
-  // ********** TO CHECK **********
   initSelection: function() {
-    var self = this;
-    var $window = $(window);
-    var $audioWave = self.$audioWave;
-    var $sliderBar = self.$sliderBar;
-    var $selectedArea = self.$selectedArea;
-
-    var audioWaveWidth;
-
-    var selectedAreaAutoChangeInterval;
+    var self = this,      
+      $window = $(window),
+      $audioVisualizationArea = self.$audioVisualizationArea,
+      $audioWave = self.$audioWave,
+      $sliderBar = self.$sliderBar,
+      $selectedArea = self.$selectedArea,
+      
+      audioWaveWidth,
+      selectedAreaAutoChangeInterval;
 
     // offsetX/offsetY 点击位置到元素左上角的距离
     // pageX/pageY 和 clientX/clientY 为点击位置到可视区域左上角的距离
@@ -736,88 +735,76 @@ RecordingEditor.prototype = {
       // 现有音轨宽度
       audioWaveWidth = $audioWave.data('waveWidth');
 
-      // 鼠标事件开始时，隐藏进度滚动条
-      $sliderBar.hide();
+      // computed the edge of visualization area      
+      // $('.class').position() 获取匹配元素相对于父元素偏移
+      // $('.class').offset() 获取匹配元素相对于当前视口的相对偏移 
+      var visualizationAreaLeftEdgeX = $audioVisualizationArea.scrollLeft() + $audioWave.offset().left;
+      var visualizationAreaRightEdgeX = visualizationAreaLeftEdgeX + $audioVisualizationArea.width();
 
       // 拖动开始位置
       var startX = e.offsetX;
       var endX;
+      var endPageX;
 
-      var moveStartX = startX;
-      var moveEndX;
+      cancelSelectedArea();
+      showSliderBar(startX);
 
       // 鼠标直接在音轨区域滑动
       $audioWave.mousemove(function(e){
         endX = e.offsetX;
-        moveEndX = endX;
+        endPageX = e.pageX;
         // 选区终边移动到可视区域边缘时，自动滚动滚动条
-        self.autoScrolled(endX, 5);
-        // 判断区域内move的方向
-        if(moveEndX > moveStartX){ 
-            showSelectedArea(startX, endX, 'right');
-        }else if(moveStartX > moveEndX){
-            showSelectedArea(startX, endX, 'left');
-        }
-        // 方向判断完毕，更新start的值
-        moveStartX = moveEndX;
+        self.autoScrolled(endX, 10);
+        showSelectedArea(startX, endX);
       });
 
       // 鼠标滑出音轨区域，在window范围内滑动的控制
       $audioWave.mouseout(function(e){
-        // moveStartX1用于判断鼠标滑动的左右方向，需要实时变更，不能只保持为mouseout时的值
-        var moveStartX1 = e.pageX;
-        var moveEndX1;
-
-        // 在window区域滑动时，选区自动变换
         $window.mousemove(function(e){
-          moveEndX1 = e.pageX;
-          clearInterval(selectedAreaAutoChangeInterval);
-          // 判断滑动的方向
-          if(moveEndX1 > moveStartX1){   
-              // 鼠标持续滑动，避免重复定时
-              selectedAreaAutoChangeInterval = setInterval(function(){
-                  selectedAreaAutoChange('right', 2);
-              }, 1);
-          }else if(moveStartX1 > moveEndX1){
-              // 鼠标持续滑动，避免重复定时
-              selectedAreaAutoChangeInterval = setInterval(function(){
-                  selectedAreaAutoChange('left', 2);
-              }, 1);
-          }
-          // 方向判断完毕，更新moveStartX1的值
-          moveStartX1 = moveEndX1;
+          selectedAreaAutoChangeInterval && clearInterval(selectedAreaAutoChangeInterval);
 
-          /*
-              @ 当鼠标画出音轨区域时，选区自动变换
-              @ params
-                  direction -> 定义终止线运动的方向
-                  step -> 定义终止线运动的距离
-              @ 注释：startX, endX在调用的过程中随时变换，所以不能通过参数传递的方式传入计时器
-           */
-          function selectedAreaAutoChange(direction, step) {
-              if(direction === 'right') {
-                  endX += step;
-              }
-              if(direction === 'left') {
-                  endX -= step;
-              }
-              if(endX > audioWaveWidth + self.canvasLeftOffset || endX < self.canvasLeftOffset) {
-                  // 需要清除选区自动变换计时器
-                  clearInterval(selectedAreaAutoChangeInterval); 
-              }
-              // 选区终边移动到可视区域边缘时，自动滚动滚动条
-              self.autoScrolled(endX, 5);
-              showSelectedArea(startX, endX, direction);
+          var moveEndPageX = e.pageX;
+          // 在可视化区域左侧
+          if(moveEndPageX < visualizationAreaLeftEdgeX ) {
+            // 鼠标持续滑动，避免重复定时
+            selectedAreaAutoChangeInterval = setInterval(function(){
+                selectedAreaAutoChange('left', 2);
+            }, 1);
+          // 在可视化区域右侧
+          }else if(moveEndPageX > visualizationAreaRightEdgeX ) {
+            // 鼠标持续滑动，避免重复定时
+            selectedAreaAutoChangeInterval = setInterval(function(){
+                selectedAreaAutoChange('right', 2);
+            }, 1);
+          // 在可视化区域内
+          }else {
+            var dValue = moveEndPageX - endPageX;
+            endX = endX + dValue;
+            endPageX = moveEndPageX;
+            showSelectedArea(startX, endX);
           }
-        });
+        })
+        
+        function selectedAreaAutoChange(direction, step) {
+          if(direction === 'right') {
+            endX += step;
+          }else if(direction === 'left') {
+            endX -= step;
+          }
+          if(endX > audioWaveWidth + self.canvasLeftOffset || endX < self.canvasLeftOffset) {
+            // 需要清除选区自动变换计时器
+            selectedAreaAutoChangeInterval && clearInterval(selectedAreaAutoChangeInterval); 
+          }
+          // 选区终边移动到可视区域边缘时，自动滚动滚动条
+          self.autoScrolled(endX, 10);
+          showSelectedArea(startX, endX);
+        }
       });
 
       // 从音轨区域外进入音轨区域时，取消选区自动变换计时器，并解除window的mousemove事件
       $audioWave.mouseover(function(e){
         // 选区自动变换计时器存在时，取消计时器
-        if(selectedAreaAutoChangeInterval) {
-            clearInterval(selectedAreaAutoChangeInterval); 
-        }
+        selectedAreaAutoChangeInterval && clearInterval(selectedAreaAutoChangeInterval); 
         $window.unbind('mousemove');
       });
 
@@ -828,41 +815,18 @@ RecordingEditor.prototype = {
     });
 
     /*
-        @ 通过拖动的起止位置来显示选区
-        @params
-            startX -> 拖动的起始位置
-            endX -> 拖动的结束位置
-            direction -> 选区自动变更时才会传入direction参数
+      @ 通过拖动的起止位置来显示选区
+      @params
+        startX -> 拖动的起始位置
+        endX -> 拖动的结束位置
      */
-    function showSelectedArea(startX, endX, direction) {
+    function showSelectedArea(startX, endX) {
       if(endX == undefined) return;
+
+      showSliderBar(startX, endX);
 
       startX = XLimit(startX);
       endX = XLimit(endX);
-
-      $selectedArea.removeClass('left-to-left')
-        .removeClass('left-to-right')
-        .removeClass('right-to-left')
-        .removeClass('right-to-right')
-        .removeClass('icon iconfont icon-to-left')
-        .removeClass('icon iconfont icon-to-right');
-
-      // 当选取的宽度不足时，不显示左右箭头       
-      if(Math.abs(startX - endX) >= 20) {
-        if(direction == 'right') {
-          if(startX > endX) {
-              $selectedArea.addClass('left-to-right').addClass('icon iconfont icon-to-right');
-          }else {
-              $selectedArea.addClass('right-to-right').addClass('icon iconfont icon-to-right');
-          }
-        }else if(direction == 'left'){
-          if(startX > endX) {
-              $selectedArea.addClass('left-to-left').addClass('icon iconfont icon-to-left');
-          }else {
-              $selectedArea.addClass('right-to-left').addClass('icon iconfont icon-to-left');
-          }
-        }
-      }
 
       if(startX > endX) {
         $selectedArea.css({
@@ -894,15 +858,7 @@ RecordingEditor.prototype = {
       $window.unbind('mousemove').unbind('mouseup');
 
       // 清除选区自动变更计时器
-      clearInterval(selectedAreaAutoChangeInterval);
-
-      // 清空选区自动变更时添加的样式
-      // $selectedArea.removeClass('left-to-left')
-      //   .removeClass('left-to-right')
-      //   .removeClass('right-to-left')
-      //   .removeClass('right-to-right')
-      //   .removeClass('icon iconfont icon-to-left')
-      //   .removeClass('icon iconfont icon-to-right');
+      selectedAreaAutoChangeInterval && clearInterval(selectedAreaAutoChangeInterval);
 
       //如果没有选区，取消之前的选取
       if(startX === endX || endX === undefined){
@@ -923,7 +879,6 @@ RecordingEditor.prototype = {
           self.initRecordCtl();
         }
       }
-      showSliderBar(startX, endX);
     }
 
     /*
@@ -983,19 +938,19 @@ RecordingEditor.prototype = {
   // endX -> 终边的X轴位置
   // offset -> 距离边界的多少距离时，开始scroll
   autoScrolled: function(endX, offset) {
-      var self = this;
+    var self = this;
 
-      var $audioVisualizationArea = self.$audioVisualizationArea;
-      var scrollLeft = $audioVisualizationArea.scrollLeft();
-      var visualizationAreaWidth = $audioVisualizationArea.width();
+    var $audioVisualizationArea = self.$audioVisualizationArea;
+    var scrollLeft = $audioVisualizationArea.scrollLeft();
+    var visualizationAreaWidth = $audioVisualizationArea.width();
 
-      // scroll to right
-      if(endX + offset >= scrollLeft + visualizationAreaWidth) {
-        $audioVisualizationArea.scrollLeft(endX + offset  - visualizationAreaWidth);
-      }else if(endX - offset <= scrollLeft) {
-      // scroll to left
-        $audioVisualizationArea.scrollLeft(endX - offset);
-      }
+    // scroll to right
+    if(endX + offset >= scrollLeft + visualizationAreaWidth) {
+      $audioVisualizationArea.scrollLeft(endX + offset  - visualizationAreaWidth);
+    }else if(endX - offset <= scrollLeft) {
+    // scroll to left
+      $audioVisualizationArea.scrollLeft(endX - offset);
+    }
   },
 
   visualizationAreaResizeCtl: function() {
@@ -1287,7 +1242,7 @@ RecordingEditor.prototype = {
     // move slider-bar in the range of playTo
     if( left <= playTo + self.canvasLeftOffset){
       $sliderBar.css('left', left);
-      self.autoScrolled(left, 5);
+      self.autoScrolled(left, 10);
     }    
   },
 
