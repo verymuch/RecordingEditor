@@ -1,10 +1,10 @@
 @font-face {
   font-family: "recording-editor-iconfont";
-  src:  url('iconfont.eot?t=1473349343'); /* IE9*/
-  src:  url('iconfont.eot?t=1473349343#iefix')    format('embedded-opentype'),  /* IE6-IE8 */
-        url('iconfont.woff?t=1473349343')         format('woff'),               /* chrome, firefox */
-        url('iconfont.ttf?t=1473349343')          format('truetype'),           /* chrome, firefox, opera, Safari, Android, iOS 4.2+ */
-        url('iconfont.svg?t=1473349343#iconfont') format('svg');                /* iOS 4.1- */
+  src:  url('iconfont.eot?t=1475119325'); /* IE9*/
+  src:  url('iconfont.eot?t=1475119325#iefix')    format('embedded-opentype'),  /* IE6-IE8 */
+        url('iconfont.woff?t=1475119325')         format('woff'),               /* chrome, firefox */
+        url('iconfont.ttf?t=1475119325')          format('truetype'),           /* chrome, firefox, opera, Safari, Android, iOS 4.2+ */
+        url('iconfont.svg?t=1475119325#iconfont') format('svg');                /* iOS 4.1- */
 }
 .recording-editor .icon.iconfont:before {
   font-family: "recording-editor-iconfont" !important;
@@ -18,6 +18,5 @@
 .recording-editor .icon-play:before     { content: "\e601"; }
 .recording-editor .icon-pause:before    { content: "\e600"; }
 .recording-editor .icon-ok:before { content: "\e602"; }
+.recording-editor .icon-waiting:before { content: "\e604"; }
 
-.recording-editor .icon-to-left:before  { content: "\e604"; }
-.recording-editor .icon-to-right:before { content: "\e605"; }

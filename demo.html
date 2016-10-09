@@ -5,6 +5,7 @@
 	<title>Recording Editor Demo</title>
 	<!-- css -->
 	<link rel="stylesheet" href="js/lib/jQuery/plugins/perfect-scrollbar/css/perfect-scrollbar.min.css">
+	<link rel="stylesheet" href="css/balloon/balloon.min.css">
 	<link rel="stylesheet" href="css/iconfont/iconfont.css">
 	<link rel="stylesheet" href="css/recording-editor.css">
 </head>
@@ -35,9 +36,9 @@
 			$insertElement: $('.demo'),
 			hasLoadedAudio: true,
 			loadedAudioURL: 'audio/star.amr',
-			showRecordedArea: false,
+			showRecordedArea: true,
 			// defaultWaveStrokeStyle: '#666',
-			durationLimit_s: 150
+			durationLimit_s: 34
 		});
 		RE.on('recordingCompleted', function() {
 			alert(1);

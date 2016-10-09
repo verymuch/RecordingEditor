@@ -1,6 +1,17 @@
 // import bus from 'bus'
 // import VueDialog from 'component/vue-dialog/main.js'
 
+// 以下被注释的代码应该能够解决safari上面的getUserMedia和createMediaStreamSource的问题
+// 在editor/index/record里有源码可以测试，我使用recorder.js可以顺利执行
+// 但是我在插入到此处后，recorder屡次为空
+// 应该解决了这个问题就好
+// 示例中我也使用了creatMediaStreamSource和getUserMedia方法,暂时显示没有问题。
+// ——钟恒 2016.9.25
+// import './lib/polyfill/flashGetUserMedia.js'
+// let div = document.createElement('div')
+// div.id = 'flashGetUserMedia'
+// document.body.appendChild(div);
+// window.flashGetUserMedia.init({swfPath: '/static/flashGetUserMedia.swf', force: false});
 
 (function(window, undefined) {
 var document = window.document,
@@ -15,8 +26,12 @@ var document = window.document,
     return new RecordingEditor.prototype.init(config);
   };
 
-
 RecordingEditor.checkMicrophone = function(callback) {
+  // getUserMedia is not supportted in safari
+  if(navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
+    callback(false, 'Safari浏览器暂不支持在线录音功能<br/>您可以使用Chrome浏览器<br/><a href="http://www.chromeliulanqi.com/">点击下载Chrome浏览器<a/>');
+    return;
+  }
   
   // getUserMedia
   navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
@@ -27,25 +42,29 @@ RecordingEditor.checkMicrophone = function(callback) {
     callback && callback(true)
   }, function(e){
     console.warn('No live audio input:' + e);
-    callback && callback(false)
+    bus.$emit('no-microphone');
+    callback && callback(false, '无麦克风或麦克风被禁止</br>请启动麦克风并刷新重试');
   });
 }
-
 // bus.$on('check-microphone', RecordingEditor.checkMicrophone);
 
 RecordingEditor.prototype = {
   version: version,
 
-  // set prototype {} need to give the constructor
+  // set prototype = {} need to give the constructor
   constructor: RecordingEditor,
 
-  $insertElement: $('body'),  // insert the rootDOM to body by default
+  // insert the rootDOM to body by default
+  $appendToElement: $('body'),  
+
+  showRecordedArea: false,
 
   // default properties about canvas's layout and drawing
   canvasLeftOffset:      20,  // begin position of time line and audio wave  
   canvasRightOffset:     30,
-  widthPreSecond_px:     60,
-  pointsNumPreSecond:    10,
+  widthPreSecond_px:     15,
+  pointsNumPreSecond:    1,
+  timeUnit_s:            5,
   omittedSamplesNum:     256, // must be 2^n and <= 4096
   defaultLineWidth:      1,
   defaultFont:             '10px April',
@@ -56,49 +75,321 @@ RecordingEditor.prototype = {
   modifiedWaveStrokeStyle: '#e74c3c', // color of inserted or replaced wave
 
   // default properties about duration limit
-  durationLimit_s: 300, // 默认录音时长限制
-  hasExceedLimit_temp: '',
-  hasExceedLimit: false,
+  durationLimit_s: 300,       // default recording duration limit(5 mins = 5 * 60 s)
+  isExceedLimit: false,       // whether exceed duration limit
+  isExceedLimit_temp: false,  // when exceed the duration limit and has selected area,
+                              // need to change the state of record ctl, then will use this temp property
 
   // properties about loaded audio
   hasLoadedAudio:    false, 
-  loadedAudioURL:    'audio/ddd.amr', 
+  loadedAudioURL:    '', 
 
   // properties in the process of recording
   hasRecordedAudio:  false,
-  hasChange:         false,
+  isChanged:         false, // whether the recording has been changed
   isInsertOrReplace: false,
   existedBuffer:     '',
   restImgData:       '',
   currentEvent:      undefined,
   eventsList:        {},
-  samplesCount:      0,  // sample counts of the recorded audio
+  samplesCount:      0,    // sample counts of the recorded audio
   duration:          0,
 
   // worker path for recorder's web worker
   WORKER_PATH: 'js/lib/recorder/RecorderWorker.js',
   // WORKER_PATH: 'static/js/lib/RecorderWorker.js',
 
+  // RecordingEditor's state
+  state: 'uninited',
+  /* 
+    state 
+      uninited:                    组件尚未初始化(默认状态)
+      initing:                     正在初始化
+      loadedAudioProcessing:       加载音频处理中
+      unavailable:                 浏览器不支持录音相关功能或麦克风未开启时组件为不可用状态
+      available:                   组件处于可用状态(初始化完成后，为可用状态；组件不处于录音、播放相关等状态时，也为可用状态)
+      recording:                   录音中
+      recordingPauseProcessing:    录音暂停处理中(录音暂停时，需要进行音频的压缩等处理，指明该状态)
+      recordingCompleteProcessing: 录音完成处理中(录音完成时，需要进行)
+      playing:                     音频播放中
+      reseting:                    组件重置中
+  */
+  /*
+    与state对应的事件  
+    event:
+      stateChange:          组件状态发生改变时触发
+      loadedAudioProcessed: 加载音频处理完成时触发
+      inited:               初始化完成时触发
+      micChecked:           麦克风检测完毕时触发
+      recordingStarted:     录音开始时触发
+      recordingPaused:      录音暂停时触发
+      recordingCompleted:   录音完成时触发
+      playingStarted:       音频播放时触发
+      playingPaused:        音频播放暂停时触发
+      playingEnded:         音频播放结束时触发（包括选区播放结束和非选区播放结束）
+      reseted:              组件重置完毕时触发
+   */
+  
   init: function( config ) {
     var self = this;
+
     // extend(merge) the config to default properties
     $.extend(true, self, config);   
-
+    
     self.initDOM();
+
+    // goto stateListener and trigger stateChange after DOM inited
+    // because the method of trigger/on/off is binded to the DOM element of this component
+    self.stateLinstener();
+    self.trigger('stateChange', [{newState: 'initing'}]);
+
     self.initRecorder();
-    self.initRecorderCtls();
     self.initAudioVisualizationArea();
 
     return self;
   },
 
+  stateLinstener: function() {
+    this.on('stateChange', this.stateChangeHandler.bind(this));
+  },
+  
+  stateChangeHandler: function(event, data /* 参考格式 [{newState: 'initing', triggerEvent: 'eventName'}] */) {
+    var self = this;
+
+    var newState = data && data.newState;
+    var triggerEvent = data && data.triggerEvent;
+
+    if(newState) {
+      self.state = newState;
+    }
+
+    if(triggerEvent) {
+      self.trigger(triggerEvent);      
+    }
+
+    console.log('current state: ', newState);
+    console.log('current event: ', triggerEvent);    
+
+    // need to show recorder ctls when the state change
+    // diff state has diff interaction
+    self.showRecorderCtls();
+
+    // 根据状态控制组件相应显示与交互的更新
+    switch(newState) {
+      case 'initing': 
+        break;
+      case 'unavailable': 
+        self.$noMicrophone.addClass('show');
+        break;
+      case 'available': 
+        self.$audioVisualizationArea.removeClass('disabled');
+        break;
+      case 'recording': 
+      case 'recordingPauseProcessing': 
+      case 'recordingCompleteProcessing': 
+      case 'playing': 
+        self.$audioVisualizationArea.addClass('disabled');
+        break;
+      default:
+        break;
+    } 
+  },
+  
+  showRecorderCtls: function() {
+    var self = this;
+    
+    // show ctls
+    self.showRecordCtl();
+    self.showPlayCtl();
+    self.showCompleteCtl();
+  },
+
+  showRecordCtl: function() {
+    var self = this;
+    var state = self.state;
+    
+    self.$recordCtl.unbind('click');
+    
+    switch(state) {
+      case 'available':
+        // 提取超出时长限制和正常录音的公共操作
+        self.$recordCtl
+          .removeClass('record-pause waiting')
+          .find('i').removeClass('icon-pause').addClass('icon-mic-1');
+
+        if(self.isExceedLimit) {
+          self.$recordCtl
+            .removeClass('record-start')
+            .addClass('disabled')
+            .attr({'data-balloon': '超过录音时长限制', 'data-balloon-pos': 'down'});          
+          return;
+        }
+        self.$recordCtl
+          .removeClass('disabled')
+          .addClass('record-start')
+          .attr({'data-balloon': '开始录音', 'data-balloon-pos': 'down'})   
+          .click(function() {
+            // 当isExceedLimit_temp为true时，即已超出时长限制，
+            // 但是因用户选区或者插入重录等操作，可以进行录制，还原该属性的值
+            if(self.isExceedLimit_temp) {
+              self.isExceedLimit_temp = false;              
+            }
+            self.startRecording();
+          });
+        break;
+      case 'recording':
+        self.$recordCtl
+          .removeClass('record-start waiting disabled')
+          .addClass('record-pause')
+          .attr({'data-balloon': '暂停录音', 'data-balloon-pos': 'down'})          
+          .click(function() {
+            // 如果录音时长提示处于显示状态，则隐藏
+            if(self.$durationLimit.hasClass('breath')) {
+              // remove mask if it shows
+              setTimeout(function() {
+                self.$durationLimit.removeClass('breath');          
+              }, 300);
+            }
+            self.pauseRecording();
+          })
+          .find('i').removeClass('icon-mic-1').addClass('icon-pause');
+        break;
+      case 'recordingPauseProcessing':
+        self.$recordCtl
+          .removeClass('record-start record-pause disabled')
+          .addClass('waiting')
+          .attr({'data-balloon': '录音处理中...', 'data-balloon-pos': 'down'});
+        break;
+      case 'loadedAudioProcessing':
+        self.$recordCtl
+          .removeClass('record-start record-pause disabled')
+          .addClass('waiting')
+          .attr({'data-balloon': '音频加载中...', 'data-balloon-pos': 'down'});
+        break;
+      default:
+        self.$recordCtl.
+          removeClass('record-start record-pause waiting')
+          .addClass('disabled')
+          .attr({'data-balloon': '当前状态无法录音', 'data-balloon-pos': 'down'});
+        break;
+    }
+  },
+
+  showPlayCtl: function() {
+    var self = this;
+    var state = self.state;
+
+    self.$playCtl.unbind('click');
+
+    switch(state) {
+      case 'available':
+        // 提取超出可播放和不可播放间的公共操作
+        self.$playCtl
+          .removeClass('audio-pause waiting')
+          .find('i').removeClass('icon-pause').addClass('icon-play');
+        
+        if( !(self.hasLoadedAudio || self.hasRecordedAudio) ) {
+          self.$playCtl
+            .removeClass('audio-play')
+            .addClass('disabled')
+            .attr({'data-balloon': '暂无音频，无法播放', 'data-balloon-pos': 'down'});
+          return;
+        }
+        self.$playCtl
+          .removeClass('disabled')
+          .addClass('audio-play')
+          .attr({'data-balloon': '开始播放', 'data-balloon-pos': 'down'})
+          .click(function() {
+            self.playAudio();
+          });
+        break;
+      case 'playing':
+        self.$playCtl
+          .removeClass('audio-play disabled waiting')
+          .addClass('audio-pause')
+          .attr({'data-balloon': '暂停播放', 'data-balloon-pos': 'down'})
+          .click(function() {
+            self.pauseAudio();
+          })
+          .find('i').removeClass('icon-play').addClass('icon-pause');
+        break;
+      case 'loadedAudioProcessing':
+        self.$playCtl
+          .removeClass('audio-play audio-pause disabled')
+          .addClass('waiting')
+          .attr({'data-balloon': '音频加载中...', 'data-balloon-pos': 'down'});
+        break;
+      default:
+        self.$playCtl
+          .removeClass('audio-play audio-pause waiting')
+          .addClass('disabled')
+          .attr({'data-balloon': '当前状态无法播放', 'data-balloon-pos': 'down'});
+        break;
+    }
+  },
+
+  showCompleteCtl: function() {
+    var self = this;
+    var state = self.state;
+
+    self.$completeCtl.unbind('click');
+
+    switch(state) {
+      case 'available':
+        // 当因用户操作导致录音时长为0时，则无法保存
+        if(self.isChanged && self.duration == 0) {
+          self.$completeCtl
+            .addClass('disabled')
+            .attr({'data-balloon': '音频长度为零，无法保存', 'data-balloon-pos': 'down'});
+          return;
+        }
+        self.$completeCtl
+          .removeClass('waiting disabled')
+          .attr({'data-balloon': '完成录音', 'data-balloon-pos': 'down'})
+          .click(function() {
+            // VueDialog.confirm(
+            //   '是否保存修改？', 
+            //   (result) => {
+            //     if(result) {
+                  // self.hide();
+                  self.completeRecording();
+            //     }
+            //   }, 
+            //   {
+            //     posRelativeTo: self.$completeCtl[0],
+            //     pos: 'bottom'
+            //   }
+            // )
+          });
+        break;
+      case 'recordingCompleteProcessing':
+        self.$completeCtl
+          .removeClass('disabled')
+          .addClass('waiting')
+          .attr({'data-balloon': '录音处理中...', 'data-balloon-pos': 'down'});
+        break;
+      case 'loadedAudioProcessing':
+        self.$completeCtl
+          .removeClass('disabled')
+          .addClass('waiting')
+          .attr('tooltips','音频加载中...');
+        break;
+      default: 
+        self.$completeCtl
+          .removeClass('waiting')
+          .addClass('disabled')
+          .attr({'data-balloon': '当前状态无法保存录音', 'data-balloon-pos': 'down'});
+        break;
+    }
+  },
+
   initDOM: function() {
     var self = this;
 
-    // insert rootDOM($RecordingEditor) to $insertElement
+    // append rootDOM($RecordingEditor) to $appendToElement
     self.rootDOM = self.$RecordingEditor = $('<div/>')
       .addClass('recording-editor')
-      .appendTo(self.$insertElement);
+      .appendTo(self.$appendToElement);
 
     // recorder ctls
     self.$recorderCtls = $('<div/>')
@@ -123,43 +414,35 @@ RecordingEditor.prototype = {
       .appendTo(self.$recorderCtls)
       .append($('<i/>').addClass('icon iconfont icon-ok'));
 
-    // no microphone warning
-    self.$noMicrophone = $('<div/>')
-      .addClass('no-microphone')
-      .appendTo(self.$RecordingEditor)
-      .html('<span>无麦克风或麦克风被禁止<br>请启动麦克风并刷新重试</span>');
-
     // audio visualization area 
     self.$audioVisualizationArea = $('<div/>')
       .addClass('audio-visualization-area')
       .appendTo(self.$RecordingEditor);
-
-    // recording limit mask layer and count down
-    self.$durationLimit = $('<div/>').addClass('duration-limit')
-      .appendTo(self.$RecordingEditor)
-      .html('还可以录<span class="count-down">10</span>秒');
-
-    self.$durationLimitCountDown = self.$durationLimit.find('span.count-down');
-
 
     // perfect-scroll plugin needs the child nodes of the specific element to be only one
     // so wrap the two canvas( time line canvas and audio wave canvas) in canvases
     var $canvases = $('<div/>').addClass('canvases').appendTo(self.$audioVisualizationArea);
 
     self.$timeLine  = $('<canvas/>')
-                        .addClass('time-line')
-                        .attr({'width':0, 'height': 20})
-                        .appendTo($canvases);
+      .addClass('time-line')
+      .attr({'width':0, 'height': 20})
+      .appendTo($canvases);
 
     self.$audioWave = $('<canvas/>')
-                        .addClass('audio-wave')
-                        .attr({'width':0, 'height': 65})
-                        .data('beginX', 0)
-                        .appendTo($canvases);
+      .addClass('audio-wave')
+      .attr({'width':0, 'height': 65})
+      .appendTo($canvases);
     
     self.$selectedArea = $('<div/>').addClass('selected-area').appendTo($canvases);
 
     self.$sliderBar = $('<div/>').addClass('slider-bar').appendTo($canvases);
+
+    // recording duration limit mask layer and count down
+    self.$durationLimit = $('<div/>').addClass('duration-limit')
+      .appendTo(self.$RecordingEditor)
+      .html('还可以录<span class="count-down">10</span>秒');
+
+    self.$durationLimitCountDown = self.$durationLimit.find('span.count-down');
 
     // recorded area, include recorded audio, download links of wav file and amr file
     self.$recordedArea = $('<div/>')
@@ -170,62 +453,61 @@ RecordingEditor.prototype = {
       .addClass('recorded-audio')
       .attr('controls',true)
       .appendTo(self.$recordedArea);
+
+    // no microphone warning
+    self.$noMicrophone = $('<div/>')
+      .addClass('no-microphone')
+      .appendTo(self.$RecordingEditor)
+      .html('<span>无麦克风或麦克风被禁止<br>请启动麦克风并刷新重试</span>');
   },
 
   initRecorder: function() { 
     var self = this;
-    // audiocontext init, userMedia init
+    // audioContext init, userMedia init
     try {
       // shim
       window.AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
 
-      // getUserMedia
+      // safari dose not support the getUserMedia, give a warning hint
+      if(navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
+        console.warn('Safari浏览器暂不支持在线录音功能。您可以尝试使用Chrome浏览器。点击下载Chrome浏览器http://www.chromeliulanqi.com/');
+      }
+
       navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
 
       window.URL = window.URL || window.webkitURL || window.mozURL;
 
-      // 创建好音频上下文
       audioContext = new AudioContext();
-
-      console.log('AudioContext set up!');
-      console.log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'supported' : 'not supported') + '!');
-
     }catch (e) {
       console.warn('Web audio API is not supported in this browser');
     }
 
-    navigator.getUserMedia({
-      audio: true
-    }, self.initUserMedia.bind(self), function(e){
-      console.warn('No live audio input:' + e);
-      self.$noMicrophone.addClass('show');
-    });
-  },
-
-  /*
-      @ getUserMedia callback
-  */
-  initUserMedia: function(stream) {
-    var self = this;
-
-    var inputStream = audioContext.createMediaStreamSource(stream);
-    recorder = new self.Recorder(inputStream, {}, self);
-
-    console.log('recorder inited!');
+    navigator.getUserMedia(
+      {
+        audio: true
+      }, 
+      function(stream) {
+        var inputStream = audioContext.createMediaStreamSource(stream);
+        recorder = new self.Recorder(inputStream, {}, self);
+      }, 
+      function(e){
+        self.trigger('stateChange', [{newState: 'unavailable', triggerEvent: 'micChecked'}]);
+      }
+    );
   },
 
   // ********** TO CHECK **********
   // recorder 的内部实现机制
   // self point to this/RecorderEditor
   Recorder: function(source, cfg, RecorderEditor){
-    var self = RecorderEditor;
+    var self        = RecorderEditor,
+      self_recorder = this,
+      config        = cfg || {},
+      bufferLen     = config.bufferLen || 4096;
 
-    var self_recorder = this;
-
-    var config = cfg || {};
-    var bufferLen = config.bufferLen || 4096;
     this.context = source.context;
     this.node = this.context.createScriptProcessor(bufferLen, 2, 2);
+    
     var worker = new Worker(config.workerPath || self.WORKER_PATH);
 
     worker.postMessage({
@@ -236,18 +518,17 @@ RecordingEditor.prototype = {
       }
     });
 
-    //从服务器加载的音频文件, 将其放入音频流中
-    this.loadAudio = function(inputBuffer) {
+    // 从服务器加载的音频文件, 将其放入音频流中
+    this.loadAudio = function(loadedBuffer) {
       worker.postMessage({
         command: 'loadAudio',
         buffer: [
-          inputBuffer.getChannelData(0),
-          inputBuffer.getChannelData(0)
+          loadedBuffer.getChannelData(0),
+          loadedBuffer.getChannelData(0)
         ]
       });
     }
 
-    // 不能将recording设为Recorder的属性，因为onaudioprocess中需要调用
     var recording = false,
       currCallback,
       restRightWidth = 0,
@@ -355,7 +636,7 @@ RecordingEditor.prototype = {
       self.$durationLimit.addClass('breath');
       self.$durationLimitCountDown.html(restDuration_s);
       if(restDuration_s == 0) {
-        self.hasExceedLimit = true;
+        self.isExceedLimit = true;
 
         // clear exceeded audio wave
         var audioWaveWidthLimit = self.widthPreSecond_px * self.durationLimit_s
@@ -400,176 +681,12 @@ RecordingEditor.prototype = {
       self.samplesCount = samplesCount;
 
       console.log('eventsList', events, events.length, samplesCount);
-      console.log(blob)
 
       currCallback(blob);
     }
 
     source.connect(this.node);
     this.node.connect(this.context.destination);    //this should not be necessary
-  },
-
-  initRecorderCtls: function () {
-    var self = this;
-
-    // init ctls
-    self.initRecordCtl();
-    self.initPlayCtl();
-    self.initCompleteCtl();
-
-    // init ctls' tooltips
-    self.initTooltips();
-  },
-
-  initRecordCtl: function() {
-    var self = this;
-
-    if(self.hasExceedLimit) {
-      self.$recordCtl.addClass('disabled').attr('tooltips','超过最大录音限制');
-      return;
-    }
-    console.log('init recorder ctl')
-    self.$recordCtl.attr('tooltips','开始录音').removeClass('disabled').click(function() {
-      self.hasExceedLimit_temp = '';
-
-      if($(this).hasClass('record-start')) {
-        // change style and content
-        $(this).removeClass('record-start').addClass('record-pause').attr('tooltips','暂停录音')
-          .find('i').removeClass('icon-mic-1').addClass('icon-pause');
-
-        // limit
-        self.$playCtl.addClass('disabled').attr('tooltips', '录制中，无法播放');
-        self.deinitPlayCtl();
-        self.$completeCtl.addClass('disabled').attr('tooltips', '录制中，无法完成录音');
-        self.deinitCompleteCtl();
-
-        // no operation in visualization-area
-        self.$audioVisualizationArea.addClass('disabled');
-
-        self.startRecording();
-      }else if($(this).hasClass('record-pause')) {
-        // remove mask if it shows
-        setTimeout(function() {
-          self.$durationLimit.removeClass('breath');          
-        }, 300);
-
-        // change style and content
-        $(this).removeClass('record-pause').addClass('record-start').attr('tooltips','开始录音')             
-          .find('i').removeClass('icon-pause').addClass('icon-mic-1');
-
-        // remove limit
-        // 暂停处理完成后
-        self.off('recordingPaused').on('recordingPaused', function(e){
-          self.hasRecordedAudio = true;
-          self.$playCtl.removeClass('disabled').attr('tooltips','开始播放');
-          self.initPlayCtl();
-          self.$completeCtl.removeClass('disabled').attr('tooltips','完成录音');
-          self.initCompleteCtl();
-          // off listener
-          self.off('recordingPaused');
-        });
-
-        // remove no operation in visualation-area
-        self.$audioVisualizationArea.removeClass('disabled');
-
-        console.time('pause record 所需时间为');
-        self.pauseRecording();
-      }
-    });
-  },
-
-  initPlayCtl: function() {
-    var self = this;
-
-    if( !(self.hasLoadedAudio || self.hasRecordedAudio) ) {
-      self.$playCtl.addClass('disabled').attr('tooltips','暂无音频，无法播放');
-      return;
-    }else {
-      self.$playCtl.removeClass('disabled');
-    }
-
-    self.$playCtl.attr('tooltips','开始播放').click(function() {
-      if($(this).hasClass('audio-play')) {
-        $(this).removeClass('audio-play').addClass('audio-pause').attr('tooltips','暂停播放')
-          .find('i').removeClass('icon-play').addClass('icon-pause');
-
-        // limit
-        self.$recordCtl.addClass('disabled').attr('tooltips', '播放中，无法录制');
-        self.deinitRecordCtl();
-        self.$completeCtl.addClass('disabled').attr('tooltips', '录制中，无法完成录音');
-        self.deinitCompleteCtl();
-
-        self.$audioVisualizationArea.addClass('disabled');
-
-        self.playAudio();
-      }else if($(this).hasClass('audio-pause')) {
-        $(this).removeClass('audio-pause').addClass('audio-play').attr('tooltips','开始播放')
-          .find('i').removeClass('icon-pause').addClass('icon-play');
-
-        self.$recordCtl.removeClass('disabled').attr('tooltips','开始录音');
-        self.initRecordCtl();
-        self.$completeCtl.removeClass('disabled').attr('tooltips','完成录音');
-        self.initCompleteCtl();
-
-        self.$audioVisualizationArea.removeClass('disabled');
-
-        self.pauseAudio();
-      }
-    });
-  },
-
-  initCompleteCtl: function() {
-    var self = this;
-
-    if(self.hasChange && self.duration == 0) {
-      self.$completeCtl.addClass('disabled').attr('tooltips','音频长度为零，无法保存');
-      return;
-    }else {
-      self.$completeCtl.removeClass('disabled');
-    }
-
-    self.$completeCtl.attr('tooltips','完成录音').click(function() {
-      // VueDialog.confirm(
-      //   '是否完成录音？', 
-      //   (result) => {
-      //     if(result) {
-            self.hide();
-            self.completeRecording();
-      //     }
-      //   }, 
-      //   {
-      //     posRelativeTo: self.$completeCtl[0],
-      //     pos: 'bottom'
-      //   }
-      // )
-    });
-  },
-
-  deinitRecordCtl: function() {
-    var self = this;
-    self.$recordCtl.unbind('click');
-  },  
-
-  deinitPlayCtl: function() {
-    var self = this;
-    self.$playCtl.unbind('click');
-  },
-
-  deinitCompleteCtl: function() {
-    var self = this;
-    self.$completeCtl.unbind('click');
-  },
-
-  initTooltips: function() {
-    var self = this;
-    self.$RecordingEditor.find('div[tooltips]').mouseover(function(){
-      var tooltips = $(this).attr('tooltips');
-      var tipsLen = tooltips.length + 1;
-      $('<div>').html(tooltips).css('width', tipsLen + 'em').addClass('tooltips').appendTo($(this));
-    });
-    self.$RecordingEditor.find('div[tooltips]').mouseout(function(){
-      $('.tooltips', $(this)).remove();
-    });
   },
 
   initAudioVisualizationArea: function() {
@@ -594,7 +711,10 @@ RecordingEditor.prototype = {
 
       // load amr from server
       if(self.hasLoadedAudio) {
-        self.visualizeLoadedAMR();
+        self.trigger('stateChange', [{newState: 'loadedAudioProcessing'}]);
+        self.visualizeLoadedAMR('init');
+      }else {
+        self.trigger('stateChange', [{newState: 'available', triggerEvent: 'inited'}]);
       }
     }else if(ctl == 'update') {
       Ps.update(audioVisualizationArea);
@@ -624,8 +744,11 @@ RecordingEditor.prototype = {
 
       // load amr from server
       if(self.hasLoadedAudio) {
-        self.visualizeLoadedAMR();
-      } 
+        self.trigger('stateChange', [{newState: 'loadedAudioProcessing'}]);
+        self.visualizeLoadedAMR('reset');
+      }else {
+        self.trigger('stateChange', [{newState: 'available', triggerEvent: 'reseted'}]);
+      }
     }
   },
 
@@ -666,7 +789,7 @@ RecordingEditor.prototype = {
       timeLineCtx.moveTo(beginX, timeLineHeight);
 
       // draw formatted secends
-      if(i % self.pointsNumPreSecond == 0) {
+      if(i % (self.pointsNumPreSecond * self.timeUnit_s) == 0) {
           timeLineCtx.lineTo(beginX, 0);
           timeLineCtx.fillText(self.formatTime(i/self.pointsNumPreSecond), beginX + 2, 12);
       }else {
@@ -864,19 +987,17 @@ RecordingEditor.prototype = {
       if(startX === endX || endX === undefined){
         cancelSelectedArea();
         // 选区取消未做其他处理时，还原exceedLimit
-        if(self.hasExceedLimit_temp == true) {
-          self.hasExceedLimit_temp = '';
-          self.hasExceedLimit = true;
-          self.deinitRecordCtl();
-          self.initRecordCtl();
+        if(self.isExceedLimit_temp == true) {
+          self.isExceedLimit_temp = false;
+          self.isExceedLimit = true;
+          self.showRecorderCtls();
         }
       }else {
         // 录音达到限制，并存在选区时，解除限制
-        if(self.hasExceedLimit == true){
-          self.hasExceedLimit_temp = true;
-          self.hasExceedLimit = false;
-          self.deinitRecordCtl();
-          self.initRecordCtl();
+        if(self.isExceedLimit == true){
+          self.isExceedLimit_temp = true;
+          self.isExceedLimit = false;
+          self.showRecorderCtls();
         }
       }
     }
@@ -938,25 +1059,24 @@ RecordingEditor.prototype = {
   // endX -> 终边的X轴位置
   // offset -> 距离边界的多少距离时，开始scroll
   autoScrolled: function(endX, offset) {
-    var self = this;
+      var self = this;
 
-    var $audioVisualizationArea = self.$audioVisualizationArea;
-    var scrollLeft = $audioVisualizationArea.scrollLeft();
-    var visualizationAreaWidth = $audioVisualizationArea.width();
+      var $audioVisualizationArea = self.$audioVisualizationArea;
+      var scrollLeft = $audioVisualizationArea.scrollLeft();
+      var visualizationAreaWidth = $audioVisualizationArea.width();
 
-    // scroll to right
-    if(endX + offset >= scrollLeft + visualizationAreaWidth) {
-      $audioVisualizationArea.scrollLeft(endX + offset  - visualizationAreaWidth);
-    }else if(endX - offset <= scrollLeft) {
-    // scroll to left
-      $audioVisualizationArea.scrollLeft(endX - offset);
-    }
+      // scroll to right
+      if(endX + offset >= scrollLeft + visualizationAreaWidth) {
+        $audioVisualizationArea.scrollLeft(endX + offset  - visualizationAreaWidth);
+      }else if(endX - offset <= scrollLeft) {
+      // scroll to left
+        $audioVisualizationArea.scrollLeft(endX - offset);
+      }
   },
 
   visualizationAreaResizeCtl: function() {
     var self = this;
     $(window).resize(function() {
-
       var $audioVisualizationArea = self.$audioVisualizationArea;
       var waveWidth = self.$audioWave.data('waveWidth');
       var visualizationAreaWidth = $audioVisualizationArea.width();
@@ -1001,7 +1121,7 @@ RecordingEditor.prototype = {
             // put the load buffer into recorder
             recorder.loadAudio(buffer);
             // save the existedBuffer and put the audio to audio element
-            recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self));
+            recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self, true));
 
             // source.buffer = buffer;
             // source.connect(audioContext.destination);
@@ -1036,7 +1156,7 @@ RecordingEditor.prototype = {
         // put the load buffer into recorder
         recorder.loadAudio(buffer);
         // save the existedBuffer and put the audio to audio element
-        recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self));   
+        recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self, true));   
 
         // source.buffer = buffer;
         // source.connect(audioContext.destination);
@@ -1047,7 +1167,8 @@ RecordingEditor.prototype = {
   },
 
   // save the existedBuffer and put the audio to audio element
-  hanldeLoadedOrRecordedAudio: function(blob) {
+  hanldeLoadedOrRecordedAudio: function(isLoaded, blob) {
+    console.log(blob,isLoaded)
     var self = this;
     // set existedBuffer the current recorded buffer
     var fr = new FileReader();
@@ -1056,10 +1177,17 @@ RecordingEditor.prototype = {
         self.existedBuffer = buffer;        
         // convert duration to ms
         self.duration = Math.round(buffer.duration * 1000);
-        console.log(buffer);
 
+        if(self.duration > 0){
+          self.hasRecordedAudio = true;          
+        }
         // 录音暂停处理后/加载完成后也触发一次该事件
-        self.trigger('recordingPaused');
+        if(isLoaded == true ) {
+          self.trigger('stateChange', {newState: 'available', triggerEvent: 'loadedAudioProcessed'});
+          self.trigger('stateChange', [{newState: 'available', triggerEvent: 'inited'}]);
+        }else {
+          self.trigger('stateChange', {newState: 'available', triggerEvent: 'recordingPaused'});          
+        }
       }, function(e) {
         console.warn(e);
       });
@@ -1079,7 +1207,9 @@ RecordingEditor.prototype = {
   startRecording: function() {
     var self = this;
 
-    self.hasChange = true;
+    self.trigger('stateChange', [{newState: 'recording', triggerEvent: 'recordingStarted'}]);
+
+    self.isChanged = true;
 
     var $audioWave = self.$audioWave;
     var $selectedArea = self.$selectedArea;
@@ -1160,19 +1290,22 @@ RecordingEditor.prototype = {
     }
     
     recorder && recorder.record(positionPercent, selectedPercent, restRightWidth);
-    console.log('start recording...');   
   },
 
   pauseRecording: function() {
     var self = this;
+
+    self.trigger('stateChange', [{newState: 'recordingPauseProcessing'}]);
     recorder && recorder.stop();
     self.restImgData = '';
-    recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self));
-    console.log('stop recording...');
+    recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self, false));
   },
 
   playAudio: function() {
     var self = this;
+
+    self.trigger('stateChange', [{newState: 'playing', triggerEvent: 'playingStarted'}]);
+
     var $recordedAudio = self.$recordedAudio;
 
     var $audioWave = self.$audioWave;
@@ -1242,7 +1375,7 @@ RecordingEditor.prototype = {
     // move slider-bar in the range of playTo
     if( left <= playTo + self.canvasLeftOffset){
       $sliderBar.css('left', left);
-      self.autoScrolled(left, 10);
+      self.autoScrolled(left, 5);
     }    
   },
 
@@ -1272,20 +1405,13 @@ RecordingEditor.prototype = {
     var $recordedAudio = self.$recordedAudio;
 
     clearInterval(self.moveSliderBarAsPlayInterval);
-
-    self.$playCtl.removeClass('audio-pause').addClass('audio-play').attr('tooltips','开始播放')
-      .find('i').removeClass('icon-pause').addClass('icon-play');
-
-    self.$recordCtl.removeClass('disabled').attr('tooltips','开始录音');
-    self.initRecordCtl();
-    self.$completeCtl.removeClass('disabled').attr('tooltips','完成录音');
-    self.initCompleteCtl();
-
-    self.$audioVisualizationArea.removeClass('disabled');    
+    self.trigger('stateChange', [{newState: 'available', triggerEvent: 'playingEnded'}])   
   },
 
   pauseAudio: function() {
     var self = this;
+
+    self.trigger('stateChange', [{newState: 'available', triggerEvent: 'playingPaused'}]);
 
     self.$recordedAudio[0].pause();  
 
@@ -1295,22 +1421,22 @@ RecordingEditor.prototype = {
   completeRecording: function() {
     var self = this;
 
+    self.trigger('stateChange', [{newState: 'recordingCompleteProcessing'}]);
+
     // if the recording has change do the wav2amr
-    if(self.hasChange) {
+    if(self.isChanged) {
       // wav to amr file
       self.wav2amr();
+    }else {
+      self.trigger('stateChange', [{newState: 'available', triggerEvent: 'recordingCompleted'}]);
     }
 
     recorder.clear();
-
-    self.trigger('recordingCompleted');
   },
 
   // wav to amr file after recording completed
   wav2amr: function() {
-    var self = this;
-    console.log('wav to amr...');
-    recorder && recorder.exportWAV(self.wavBlob2Amr.bind(self));
+    recorder && recorder.exportWAV(this.wavBlob2Amr.bind(this));
   }, 
   
   // convert the exported wav blob to amr
@@ -1360,26 +1486,13 @@ RecordingEditor.prototype = {
 
     // upload amr file
     self.uploadAmrFile(blob);
+
+    self.trigger('stateChange', [{newState: 'available', triggerEvent: 'recordingCompleted'}]);
   },
 
   uploadAmrFile: function(blob) {
     console.warn('You\'d better give a function named "uploadAmrFile" to RecordingEditor which can upload "blob" to the server!');
   },
-  /* uoloadAmrFile example:
-    uploadAmrFile: function(blob) {
-      var self = this;
-
-      var formdata = new FormData()
-      formdata.append('file', blob, new Date().toISOString() + '.amr');
-
-      audioUpload.upload(formdata).done(function(data) {
-        var uploadUrl = data.data.audio_url;
-        self.trigger('completeRecord', [{'audio_url': uploadUrl}]);
-      }).fail(function(error) {
-        console.log(error);
-      });
-    },
-  */
  
   // ************ TO CHECK *********
   drawLoadedOrExistedAudioWave: function(audioBuffer) {
@@ -1539,7 +1652,7 @@ RecordingEditor.prototype = {
 
       $sliderBar.css('left', Math.ceil(beginX));
       // scroll perfectScrollbar as the slider-bar move
-      self.scrollPerfectScrollbar();
+      scrollPerfectScrollbar();
 
       waveWidth = Math.ceil(beginX + newRestRightWidth - self.canvasLeftOffset);
       $audioWaveCanvas.data('waveWidth', waveWidth);
@@ -1548,28 +1661,27 @@ RecordingEditor.prototype = {
       
       $audioWaveCanvas.data('beginX', beginX);  
     }
-  },
 
-  scrollPerfectScrollbar: function() {
-    var self = this;
-    var $audioVisualizationArea = self.$audioVisualizationArea;
-    var currentScrollLeft = $audioVisualizationArea.scrollLeft();
 
-    var $canvases = $audioVisualizationArea.find('.canvases');  
-    var $sliderBar = self.$sliderBar;    
-    var canvasesWidth = $canvases.width();
-    var sliderBarLeft = parseInt($sliderBar.css('left'));
-    var computedScrollLeft = sliderBarLeft - canvasesWidth + this.canvasRightOffset;
-    
-    if(currentScrollLeft < computedScrollLeft){
-      $audioVisualizationArea.scrollLeft(computedScrollLeft);
+    function scrollPerfectScrollbar() {
+      var $audioVisualizationArea = self.$audioVisualizationArea;
+      var currentScrollLeft = $audioVisualizationArea.scrollLeft();
+
+      var $canvases = $audioVisualizationArea.find('.canvases');  
+      var $sliderBar = self.$sliderBar;    
+      var canvasesWidth = $canvases.width();
+      var sliderBarLeft = parseInt($sliderBar.css('left'));
+      var computedScrollLeft = sliderBarLeft - canvasesWidth + self.canvasRightOffset;
+      if(currentScrollLeft < computedScrollLeft){
+        $audioVisualizationArea.scrollLeft(computedScrollLeft);
+      }
     }
   },
 
   resizeCanvas: function(width) {
     var self = this;
     var $audioWave = self.$audioWave;
-    
+
     // copy image data
     var audioWaveCtx = $audioWave[0].getContext('2d');
     var currentImgData = audioWaveCtx.getImageData(0, 0, $audioWave[0].width, $audioWave[0].height);
@@ -1597,14 +1709,17 @@ RecordingEditor.prototype = {
   reset: function(config) {
     var self = this;
 
+    self.trigger('stateChange', [{newState: 'reseting'}]);
+    
     self.resetDefaultProps();
     // extend must after reset default props 
     $.extend(true, self, config); 
 
     self.resetRecorder();  
-    self.resetRecorderCtls();
     self.resetRecordedArea();
     self.resetAudioVisualizationArea();
+
+    // self.trigger('stateChange', [{newState: 'available', triggerEvent: 'reseted'}]);
   },
 
   resetDefaultProps: function() {
@@ -1613,9 +1728,12 @@ RecordingEditor.prototype = {
     self.hasLoadedAudio = false; 
     self.loadedAudioURL = '';
 
+    self.isExceedLimit_temp = false;
+    self.isExceedLimit = false;
+
     // properties in the process of recording
     self.hasRecordedAudio   = false;
-    self.hasChange          = false,
+    self.isChanged          = false,
     self.isInsertOrReplace  = false;
     self.existedBuffer      = '';
     self.restImgData        = '';
@@ -1630,32 +1748,19 @@ RecordingEditor.prototype = {
     recorder.clear();
   },
 
-  resetRecorderCtls: function() {
-    var self = this;
-    self.deinitRecorderCtls();
-    self.initRecorderCtls();
-  },
-
-  deinitRecorderCtls: function () {
-    var self = this;
-    self.deinitRecordCtl();
-    self.deinitPlayCtl();
-    self.deinitCompleteCtl();
-  }, 
-
-  resetAudioVisualizationArea: function() {
-    var self = this;
-    var resetCanvasWidth = self.$audioVisualizationArea.width();
-    self.audioVisualizationAreaControl('reset', resetCanvasWidth);
-  },
-
   resetRecordedArea: function() {
     var self = this;
     // reset the recorded audio
     self.$recordedAudio.attr('src', '');
     // remove download anchor
     self.$recordedArea.find('a').remove();
-  },   
+  }, 
+
+  resetAudioVisualizationArea: function() {
+    var self = this;
+    var resetCanvasWidth = self.$audioVisualizationArea.width();
+    self.audioVisualizationAreaControl('reset', resetCanvasWidth);
+  },  
 
   hide: function() {
     var self = this;

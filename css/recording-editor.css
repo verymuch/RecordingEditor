@@ -39,32 +39,36 @@
     text-align: center;
     border-radius: 2px;
 }
-/* recorder ctl's tooltips style */
-.recording-editor .tooltips {
-    position: absolute;
-    top: 115%;
-    left: 50%;
-    -webkit-transform: translate(-50%, 0%);
-            transform: translate(-50%, 0%);
-    font-size: 12px;
-    line-height: 24px;
-    color: #fff;
-    background-color: rgb(60, 60, 60);
-    border-radius: 2px;
-    z-index: 2;
+/* recorder ctl's balloon style */
+[data-balloon-pos=down]:after, 
+[data-balloon-pos=down]:before,
+[data-balloon-pos=down]:hover:after, 
+[data-balloon-pos=down]:hover:before, 
+[data-balloon-pos=down][data-balloon-visible]:after, 
+[data-balloon-pos=down][data-balloon-visible]:before {
+    line-height: 1;
 }
-.recording-editor .tooltips:before {
-    display: block;
-    content: '';
-    position: absolute;
-    top: -3px;
-    left: calc(50% - 5px);
-    width: 10px;
-    height: 10px;
-    -webkit-transform: rotate(45deg);
-            transform: rotate(45deg);
-    background-color: inherit;
-    z-index: -1;
+/* 录音处理过程中，recorder-ctl的样式 */
+.recording-editor .recorder-ctl.waiting {
+    background-color: rgba(64, 203, 144, .77);
+}
+.recording-editor .recorder-ctl.waiting i {
+    display: inline-block;
+    animation: rotateCircle 1.3s linear infinite;
+}
+.recording-editor .recorder-ctl.waiting i:before {
+    content: '\e604';
+}
+@keyframes rotateCircle {
+    0% {
+        transform: rotate(0deg);
+    }
+    50% {
+        transform: rotate(180deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 .recorder-ctl.record-start, 
 .recorder-ctl.audio-play, 
@@ -76,11 +80,11 @@
 .recorder-ctl.record-complete:hover {
     background-color: rgba(104, 214, 167, 1);
 }
-.recorder-ctl.record-start.disabled, 
-.recorder-ctl.audio-play.disabled, 
+.recorder-ctl.record.disabled, 
+.recorder-ctl.audio.disabled, 
 .recorder-ctl.record-complete.disabled {
-    /*opacity: .5;*/
-    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=100)"; /* 透明度<1 导致tooltips无法正常显示 */
+    opacity: 1;
+    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=100)"; /* 透明度<1 导致balloon无法正常显示 */
     pointer-events: all;
     color: rgba(136, 136, 136, 1);
     background-color: rgba(68, 68, 68, 1);
