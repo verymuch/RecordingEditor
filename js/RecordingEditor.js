@@ -1298,8 +1298,6 @@ RecordingEditor.prototype = {
   playAudio: function() {
     var self = this;
 
-    self.trigger('stateChange', [{newState: 'playing', triggerEvent: 'playingStarted'}]);
-
     var $recordedAudio = self.$recordedAudio;
 
     var $audioWave = self.$audioWave;
@@ -1341,6 +1339,8 @@ RecordingEditor.prototype = {
 
     var currentTime = playBeginX / waveWidth * duration || 0;
     self.playBegin_ms = Math.ceil(currentTime * 1000);
+
+    self.trigger('stateChange', [{newState: 'playing', triggerEvent: 'playingStarted'}]);
 
     $recordedAudio[0].currentTime = currentTime;
     $recordedAudio[0].play();

@@ -143,6 +143,7 @@
 .recording-editor .canvases {
     position: relative;
     height: 85px;
+    margin-top: 18px;
 }
 .recording-editor .time-line, 
 .recording-editor .audio-wave {
@@ -236,14 +237,17 @@
 }
 
 /* perfect scrollbar specific style in recording editor */
+.recording-editor .ps-container {
+    overflow-y: auto !important; 
+}
 .recording-editor .ps-container > .ps-scrollbar-x-rail {
+    top: 1px;
     margin-bottom: 2px; 
     opacity: .5; 
     -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=50)";
     background-color: transparent !important;
 }
 .recording-editor .ps-container > .ps-scrollbar-x-rail > .ps-scrollbar-x {
-    bottom: 0;
     height: 6px;
 }
 .recording-editor .ps-container > .ps-scrollbar-x-rail:hover > .ps-scrollbar-x, 
