@@ -92,7 +92,6 @@ RecordingEditor.prototype = {
   restImgData:       '',
   newRestRightWidth: 0, // 无选区插入音频时，初步替换音轨，需要实时计算右侧剩余的宽度
   currentEvent:      undefined,
-  unconvertEventsList:   undefined,
   eventsList:        {},
   samplesCount:      0,    // sample counts of the recorded audio
   duration:          0,
@@ -559,10 +558,10 @@ RecordingEditor.prototype = {
 
     // ******从服务器加载时，需要传递eventsList
     // 从服务器加载的音频文件, 将其放入音频流中
-    this.loadAudio = function(loadedBuffer, unconvertEventsList) {
+    this.loadAudio = function(loadedBuffer, eventsList) {
       worker.postMessage({
         command: 'loadAudio',
-        unconvertEventsList: unconvertEventsList,
+        eventsList: eventsList,
         buffer: [
           loadedBuffer.getChannelData(0),
           loadedBuffer.getChannelData(0)
@@ -669,12 +668,11 @@ RecordingEditor.prototype = {
     }
 
     this.handleExportWAV = function(data) {
-      self.unconvertEventsList = data.unconvertEventsList;
       self.eventsList          = data.eventsList;
       self.samplesCount        = data.samplesCount;
       
       // 待删除
-      console.log(self.unconvertEventsList, self.eventsList, self.samplesCount, data.audioBlob)
+      console.log(self.eventsList, self.samplesCount, data.audioBlob)
 
       currCallback(data.audioBlob);
     }
@@ -1114,7 +1112,7 @@ RecordingEditor.prototype = {
             console.timeEnd('加载音频可视化时间');
 
             // put the load buffer into recorder
-            recorder.loadAudio(buffer, self.unconvertEventsList);
+            recorder.loadAudio(buffer, self.eventsList);
             // save the existedBuffer and put the audio to audio element
             recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self, true));
 
@@ -1149,7 +1147,7 @@ RecordingEditor.prototype = {
         console.timeEnd('加载音频可视化时间');
 
         // put the load buffer into recorder
-        recorder.loadAudio(buffer, self.unconvertEventsList);
+        recorder.loadAudio(buffer, self.eventsList);
         // save the existedBuffer and put the audio to audio element
         recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self, true));   
 
@@ -1740,8 +1738,8 @@ RecordingEditor.prototype = {
   resetDefaultProps: function() {
     var self = this;
 
-    self.hasLoadedAudio = false; 
-    self.loadedAudioURL = '';
+    self.hasLoadedAudio   = false; 
+    self.loadedAudioURL   = '';
 
     self.isExceedLimit_temp = false;
     self.isExceedLimit = false;
@@ -1754,7 +1752,6 @@ RecordingEditor.prototype = {
     self.restImgData         = '';
     self.newRestRightWidth   = 0;
     self.currentEvent        = undefined;
-    self.unconvertEventsList = undefined,
     self.eventsList          = {};
     self.samplesCount        = 0;
     self.duration            = 0;

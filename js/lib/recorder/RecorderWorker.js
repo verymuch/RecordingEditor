@@ -58,8 +58,8 @@ function loadAudio(inputBuffer, loadedEventsList){
 
   recordBuffers = recordBuffers.concat(interleaved);
 
-  if(loadedEventsList){
-    eventsList = loadedEventsList;
+  if(JSON.stringify(loadedEventsList) != '{}'){
+    eventsList = deconvertEventsList(loadedEventsList, recordBuffers.length);
   }else {
     eventsList[recordBuffers.length - 1] = undefined;    
   }
@@ -148,7 +148,6 @@ function exportWAV(type){
   this.postMessage({
     command: 'exportWAV',
     audioBlob: audioBlob,
-    unconvertEventsList: eventsList,
     eventsList: convertEventsList(eventsList),
     samplesCount: recordBuffers.length
   });
@@ -256,4 +255,15 @@ function convertEventsList(eventsList) {
   }
   
   return convertedEventsList;
+}
+
+function deconvertEventsList(convertedEventsList, len) {
+  var eventsList = [];
+  eventsList.length = len;
+  for(var e_i in convertedEventsList) {
+    if(convertedEventsList[e_i]) {
+      eventsList[e_i * sampleRate * 2 / 1000] = convertedEventsList[e_i];
+    }
+  }
+  return eventsList;
 }
