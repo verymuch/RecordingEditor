@@ -97,6 +97,8 @@ RecordingEditor.prototype = {
   samplesCount:      0,    // sample counts of the recorded audio
   duration:          0,
 
+  // properties in the process of playing
+  playBegin_ms: 0,
 
   // worker path for recorder's web worker
   WORKER_PATH: 'js/lib/recorder/RecorderWorker.js',
@@ -1338,6 +1340,7 @@ RecordingEditor.prototype = {
     }
 
     var currentTime = playBeginX / waveWidth * duration || 0;
+    self.playBegin_ms = Math.ceil(currentTime * 1000);
 
     $recordedAudio[0].currentTime = currentTime;
     $recordedAudio[0].play();
@@ -1755,6 +1758,9 @@ RecordingEditor.prototype = {
     self.eventsList          = {};
     self.samplesCount        = 0;
     self.duration            = 0;
+
+    // properties in the process of playing
+    self.playBegin_ms        = 0;
   },
 
   resetRecorder: function() {
