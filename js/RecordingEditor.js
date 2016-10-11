@@ -90,10 +90,13 @@ RecordingEditor.prototype = {
   isInsertOrReplace: false,
   existedBuffer:     '',
   restImgData:       '',
+  newRestRightWidth: 0, // 无选区插入音频时，初步替换音轨，需要实时计算右侧剩余的宽度
   currentEvent:      undefined,
+  unconvertEventsList:   undefined,
   eventsList:        {},
   samplesCount:      0,    // sample counts of the recorded audio
   duration:          0,
+
 
   // worker path for recorder's web worker
   WORKER_PATH: 'js/lib/recorder/RecorderWorker.js',
@@ -496,19 +499,26 @@ RecordingEditor.prototype = {
     );
   },
 
-  // ********** TO CHECK **********
   // recorder 的内部实现机制
-  // self point to this/RecorderEditor
   Recorder: function(source, cfg, RecorderEditor){
-    var self        = RecorderEditor,
+    var self        = RecorderEditor, // self point to this/RecorderEditor
       self_recorder = this,
+      
       config        = cfg || {},
-      bufferLen     = config.bufferLen || 4096;
+      bufferLen     = config.bufferLen || 4096,
+      worker        = new Worker(config.workerPath || self.WORKER_PATH),
+
+      // recoding related variables
+      recording = false,
+      currCallback,
+      restRightWidth = 0,
+      positionPercent = 0,
+      selectedPercent = 0;
 
     this.context = source.context;
     this.node = this.context.createScriptProcessor(bufferLen, 2, 2);
-    
-    var worker = new Worker(config.workerPath || self.WORKER_PATH);
+    source.connect(this.node);
+    this.node.connect(this.context.destination);
 
     worker.postMessage({
       command: 'init',
@@ -518,33 +528,16 @@ RecordingEditor.prototype = {
       }
     });
 
-    // 从服务器加载的音频文件, 将其放入音频流中
-    this.loadAudio = function(loadedBuffer) {
-      worker.postMessage({
-        command: 'loadAudio',
-        buffer: [
-          loadedBuffer.getChannelData(0),
-          loadedBuffer.getChannelData(0)
-        ]
-      });
-    }
-
-    var recording = false,
-      currCallback,
-      restRightWidth = 0,
-      positionPercent = 0,
-      selectedPercent = 0;
-
+    // 待注释或删除 
+    // 计算每次处理音频的时间
     var prev = new Date().getTime();
     this.node.onaudioprocess = function(e){
       if (!recording) return;
 
+      // 待注释或删除
       var now = new Date().getTime();
       console.log('audio processing time', now - prev);
       prev = now;
-
-      // restRightWidth = $('.audio-wave').data('waveWidth') - $('.audio-wave').data('beginX') + canvasLeftOffset;
-      // restRightWidth = restRightWidth < 0 ? 0 : restRightWidth;
       
       // 绘制音轨
       self.drawAudioWave(e.inputBuffer, positionPercent, selectedPercent, restRightWidth);
@@ -558,20 +551,21 @@ RecordingEditor.prototype = {
         ]
       });
 
+      // 重置currentEvent
       self.currentEvent = undefined;
     }
 
-    /*
-      @ Recorder 配置函数
-      @ params 
-          cfg(数组类型) -> Recorder的配置参数数组
-     */
-    this.configure = function(cfg){
-      for (var prop in cfg){
-        if (cfg.hasOwnProperty(prop)){
-          config[prop] = cfg[prop];
-        }
-      }
+    // ******从服务器加载时，需要传递eventsList
+    // 从服务器加载的音频文件, 将其放入音频流中
+    this.loadAudio = function(loadedBuffer, unconvertEventsList) {
+      worker.postMessage({
+        command: 'loadAudio',
+        unconvertEventsList: unconvertEventsList,
+        buffer: [
+          loadedBuffer.getChannelData(0),
+          loadedBuffer.getChannelData(0)
+        ]
+      });
     }
 
     this.record = function(positionPercentTemp, selectedPercentTemp, restRightWidthTemp){
@@ -583,9 +577,9 @@ RecordingEditor.prototype = {
 
       console.log(positionPercent, selectedPercent, restRightWidth);
 
-      // 点击开始录音时，设定本次录音插入的位置
+      // 点击开始录音时，设定本次录音插入的位置及选区的大小
       worker.postMessage({
-        command: 'insert',
+        command: 'setVariable',
         positionPercent: positionPercent,
         selectedPercent: selectedPercent
       });
@@ -593,10 +587,6 @@ RecordingEditor.prototype = {
 
     this.stop = function(){
       recording = false;
-    }
-
-    this.reset = function(){
-      worker.postMessage({ command: 'reset' });
     }
 
     this.clear = function(){
@@ -618,6 +608,7 @@ RecordingEditor.prototype = {
       });
     }
 
+    // processing with web worker message
     worker.onmessage = function(e){
       switch(e.data.command){
         case 'durationLimit':
@@ -626,6 +617,9 @@ RecordingEditor.prototype = {
         case 'exportWAV':
           self_recorder.handleExportWAV(e.data);
           break;
+        case 'getBuffer':
+          self_recorder.handleGetBuffer(e.data);
+          break;
         default:
           break;
       }
@@ -633,10 +627,15 @@ RecordingEditor.prototype = {
 
     this.handleDurationLimit = function(data) {
       var restDuration_s = data.restDuration_s;
+      
       self.$durationLimit.addClass('breath');
       self.$durationLimitCountDown.html(restDuration_s);
+      
       if(restDuration_s == 0) {
         self.isExceedLimit = true;
+
+        // change record ctl
+        self.$recordCtl.click();
 
         // clear exceeded audio wave
         var audioWaveWidthLimit = self.widthPreSecond_px * self.durationLimit_s
@@ -659,34 +658,28 @@ RecordingEditor.prototype = {
           audioWaveCtx.lineTo(audioWaveWidthLimit + self.canvasLeftOffset + dValue, halfHeight);
           audioWaveCtx.stroke();
 
+          // update the audio wave's data and slider-bar
           $audioWaveCanvas.data('waveWidth', audioWaveWidthLimit);
           $audioWaveCanvas.data('beginX', $audioWaveCanvas.data('beginX') - dValue);
           self.$sliderBar.css('left', parseInt(self.$sliderBar.css('left')) - dValue); 
         }
-
-        // change record ctl
-        self.$recordCtl
-          .click().unbind('click')
-          .addClass('disabled')
-          .attr('tooltips','超过最大录音限制');
       }
     }
 
     this.handleExportWAV = function(data) {
-      var blob = data.audioBlob;
-      var events = data.eventsList;
-      var samplesCount = data.samplesCount;
+      self.unconvertEventsList = data.unconvertEventsList;
+      self.eventsList          = data.eventsList;
+      self.samplesCount        = data.samplesCount;
+      
+      // 待删除
+      console.log(self.unconvertEventsList, self.eventsList, self.samplesCount, data.audioBlob)
 
-      self.eventsList = events;
-      self.samplesCount = samplesCount;
-
-      console.log('eventsList', events, events.length, samplesCount);
-
-      currCallback(blob);
+      currCallback(data.audioBlob);
     }
 
-    source.connect(this.node);
-    this.node.connect(this.context.destination);    //this should not be necessary
+    this.handleGetBuffer = function(data) {
+      var buffer = data.buffer;
+    }
   },
 
   initAudioVisualizationArea: function() {
@@ -1119,7 +1112,7 @@ RecordingEditor.prototype = {
             console.timeEnd('加载音频可视化时间');
 
             // put the load buffer into recorder
-            recorder.loadAudio(buffer);
+            recorder.loadAudio(buffer, self.unconvertEventsList);
             // save the existedBuffer and put the audio to audio element
             recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self, true));
 
@@ -1154,7 +1147,7 @@ RecordingEditor.prototype = {
         console.timeEnd('加载音频可视化时间');
 
         // put the load buffer into recorder
-        recorder.loadAudio(buffer);
+        recorder.loadAudio(buffer, self.unconvertEventsList);
         // save the existedBuffer and put the audio to audio element
         recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self, true));   
 
@@ -1199,8 +1192,6 @@ RecordingEditor.prototype = {
     var $recordedAudio = self.$recordedAudio;
     $recordedAudio.attr('src', url);
     $recordedAudio.attr('controls', true);
-
-    console.timeEnd('stop record 所需时间为');
   },
 
   // ****** TO CHECK *****
@@ -1298,6 +1289,7 @@ RecordingEditor.prototype = {
     self.trigger('stateChange', [{newState: 'recordingPauseProcessing'}]);
     recorder && recorder.stop();
     self.restImgData = '';
+    self.newRestRightWidth = 0;
     recorder.exportWAV(self.hanldeLoadedOrRecordedAudio.bind(self, false));
   },
 
@@ -1557,16 +1549,14 @@ RecordingEditor.prototype = {
     $audioWaveCanvas.data('waveWidth', waveWidth);
   },
 
-  // ************ TO CHECK *********
-  // restRightWidth -> the width form right side which does not redraw
+  // restRightWidth -> the width form right side which does not redraw when the selection area existed
+  // (即当时选区插入操作时，右侧部分不需要重绘)
   drawAudioWave: function(audioBuffer, positionPercent, selectedPercent, restRightWidth) {  
     var self = this;
-    // if(newRestRightWidth >= 0) {
-    //  restRightWidth = newRestRightWidth;
-    // }
-    var $timeLineCanvas         = self.$timeLine;
-    var $audioWaveCanvas        = self.$audioWave;
-    var $sliderBar              = self.$sliderBar;
+
+    var $timeLineCanvas  = self.$timeLine;
+    var $audioWaveCanvas = self.$audioWave;
+    var $sliderBar       = self.$sliderBar;
 
     var beginX       = $audioWaveCanvas.data('beginX');
     var waveWidth    = $audioWaveCanvas.data('waveWidth');
@@ -1575,39 +1565,28 @@ RecordingEditor.prototype = {
     var halfHeight   = canvasHeight / 2;
 
     var audioChannelData = audioBuffer.getChannelData(0);  
-    var sampleRate = audioBuffer.sampleRate;
-    var bufferLen = audioChannelData.length;    
+    var sampleRate       = audioBuffer.sampleRate;
+    var bufferLen        = audioChannelData.length;    
 
     // compute the distance of two wave line(vertical line) 
-    var sliceWidth = self.widthPreSecond_px * self.omittedSamplesNum / sampleRate  ;
+    var sliceWidth = self.widthPreSecond_px * self.omittedSamplesNum / sampleRate;
 
     var canvasCtx = $audioWaveCanvas[0].getContext('2d');
 
     var y = 0,
       beginXOffset;
-    var newRestRightWidth = 0;
     for(var i = 0; i < bufferLen; i += self.omittedSamplesNum){ 
       // make it to be (int + 0.5)
       beginXOffset = Math.floor(beginX) + 0.5;
 
-      // get imgdata of the right side rest 
-      if(restRightWidth != 0) {
-        // if(selectedPercent == 0) {
-        //  newRestRightWidth = restRightWidth - sliceWidth;
-        //  newRestRightWidth = newRestRightWidth < 0 ? 0 : newRestRightWidth;
-        //  console.log(newRestRightWidth,'newRestRightWidth')
-        // }else {
-          newRestRightWidth = restRightWidth;
-        // }
-        //
+      // 计算当前canvas需要的宽度，判断是否需要进行resizeCanvas
+      var currentCanvasWidth;
 
+      // 当存在选区，且右侧剩余宽度不为0时，进行插入操作，并且每次将右侧canvas内容复制在最后(在本次绘制完成后put)
+      // get imgdata of the right side rest 
+      if(selectedPercent != 0 && restRightWidth != 0) {
         // 本次录音过程中，将restImgData暂存，暂停录音时，reset该值
-        if(self.restImgData != '') {
-          var restImgData = self.restImgData;
-        }else {
-          var restImgData = canvasCtx.getImageData(waveWidth - newRestRightWidth + self.canvasLeftOffset , 0, newRestRightWidth, canvasHeight);    
-          self.restImgData = restImgData;      
-        }
+        self.restImgData = self.restImgData || canvasCtx.getImageData(waveWidth - restRightWidth + self.canvasLeftOffset , 0, restRightWidth, canvasHeight);;
 
         // clean right canvas
         canvasCtx.clearRect(waveWidth - restRightWidth + self.canvasLeftOffset, 1, restRightWidth, canvasHeight - 2);
@@ -1619,14 +1598,38 @@ RecordingEditor.prototype = {
         canvasCtx.moveTo(waveWidth - restRightWidth + self.canvasLeftOffset, halfHeight);
         canvasCtx.lineTo(waveWidth - restRightWidth + self.canvasLeftOffset + restRightWidth, halfHeight);
         canvasCtx.stroke();
+        
+        currentCanvasWidth = beginXOffset + restRightWidth + self.canvasRightOffset;
+
+      // 当不存在选区，且右侧剩余宽度不为0时，进行替换操作，逐步替换右侧内容
+      }if(selectedPercent == 0 && restRightWidth != 0) {
+        self.newRestRightWidth = self.newRestRightWidth ? self.newRestRightWidth - sliceWidth : restRightWidth - sliceWidth;
+
+        // clear的最小单位为1px, Math.ceil(sliceWidth)进行取整
+        // clean canvas by next sliceWidth
+        canvasCtx.clearRect(beginX, 1, Math.ceil(sliceWidth), canvasHeight - 2);
+
+        canvasCtx.strokeStyle = self.defaultHLStrokeStyle;
+        canvasCtx.lineWidth = self.defaultLineWidth;
+        canvasCtx.beginPath();
+        // draw the middle line again
+        canvasCtx.moveTo(beginX, halfHeight);
+        canvasCtx.lineTo(beginX + Math.ceil(sliceWidth), halfHeight);
+        canvasCtx.stroke();
+
+        currentCanvasWidth = beginXOffset + self.canvasRightOffset;
+        
+
+      // 其他情况相当于在后侧插入新的内容
+      }else {
+        currentCanvasWidth = beginXOffset + self.canvasRightOffset;
       } 
 
-      if(beginXOffset + restRightWidth >= (canvasWidth - self.canvasRightOffset) ) {
-        // if the width is less than the needed, add self.widthPreSecond_px
-        var newCanvasWidth = Math.ceil(beginXOffset + restRightWidth + self.canvasRightOffset + self.widthPreSecond_px);
+      if(currentCanvasWidth >= canvasWidth ) {
+        // if the width is less than the needed, add self.widthPreSecond_px * self.timeUnit_s，避免频繁进行resizeCanvas
+        var newCanvasWidth = Math.ceil(currentCanvasWidth + self.widthPreSecond_px * self.timeUnit_s);
           // update canvasWidth, or next for still will be in self if 
           canvasWidth = newCanvasWidth;
-
           self.resizeCanvas(newCanvasWidth);
       }
 
@@ -1646,17 +1649,26 @@ RecordingEditor.prototype = {
       canvasCtx.lineTo(beginXOffset, canvasHeight - y);
       canvasCtx.stroke();
 
-      if(restRightWidth != 0) {
-        canvasCtx.putImageData(restImgData, Math.ceil(beginX), 0);
+      if(selectedPercent !=0 && restRightWidth != 0) {
+        canvasCtx.putImageData(self.restImgData, Math.ceil(beginX), 0);
       }
 
       $sliderBar.css('left', Math.ceil(beginX));
       // scroll perfectScrollbar as the slider-bar move
       scrollPerfectScrollbar();
 
-      waveWidth = Math.ceil(beginX + newRestRightWidth - self.canvasLeftOffset);
+      if(selectedPercent != 0 && restRightWidth != 0) {
+        waveWidth = Math.ceil(beginX + restRightWidth - self.canvasLeftOffset);
+      }else if(selectedPercent == 0 && restRightWidth != 0) {
+        // 当逐步替换超出之前音轨的距离时，开始计算新的音轨宽度
+        if(self.newRestRightWidth < 0) {
+          waveWidth = Math.ceil(beginX - self.canvasLeftOffset);
+        }
+      }else{
+        waveWidth = Math.ceil(beginX - self.canvasLeftOffset);
+      }
       $audioWaveCanvas.data('waveWidth', waveWidth);
-      restRightWidth = newRestRightWidth
+
       beginX += sliceWidth;
       
       $audioWaveCanvas.data('beginX', beginX);  
@@ -1732,15 +1744,17 @@ RecordingEditor.prototype = {
     self.isExceedLimit = false;
 
     // properties in the process of recording
-    self.hasRecordedAudio   = false;
-    self.isChanged          = false,
-    self.isInsertOrReplace  = false;
-    self.existedBuffer      = '';
-    self.restImgData        = '';
-    self.currentEvent       = undefined;
-    self.eventsList         = {};
-    self.samplesCount       = 0;
-    self.duration           = 0;
+    self.hasRecordedAudio    = false;
+    self.isChanged           = false,
+    self.isInsertOrReplace   = false;
+    self.existedBuffer       = '';
+    self.restImgData         = '';
+    self.newRestRightWidth   = 0;
+    self.currentEvent        = undefined;
+    self.unconvertEventsList = undefined,
+    self.eventsList          = {};
+    self.samplesCount        = 0;
+    self.duration            = 0;
   },
 
   resetRecorder: function() {

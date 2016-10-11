@@ -1,19 +1,21 @@
-var recLength = 0,
+var recordBuffers = [],
   eventsList = [],
-  recBuffers = [],
   sampleRate,
+
+  durationLimit_s = 300, // 默认录音时长限制
+  currentDuration_s = 0,
+  bufferLenLimit,
+
+  // 点击录音开始时，录音插入的位置
   /*
-      每次点击都重置初始的插入位置和本次录音的buffer的长度
+      每次点击开始录音时都重置初始的插入位置和本次录音的buffer的长度
       用于实现音频定点插入，不是每次都根据slider-bar计算插入位置，计算出的位置存在不准确性
       所以通过该方式只进行一次计算
    */
-  // 点击录音开始时，录音插入的位置
   insertPostion,
+  selectedPercent,
   // 点击录音开始后的当前buffer 总长度，直到下一次点击start时，重置为0；
-  currentBufferlenth,
-  durationLimit_s = 300, // 默认录音时长限制
-  currentDuration_s = 0,
-  bufferLenLimit;
+  currentBufferlenth;
 
 this.onmessage = function(e){
   switch(e.data.command){
@@ -21,10 +23,10 @@ this.onmessage = function(e){
       init(e.data.config);
       break;
     case 'loadAudio':
-      loadAudio(e.data.buffer);
+      loadAudio(e.data.buffer, e.data.eventsList);
       break;
-    case 'insert':
-      insert(e.data.positionPercent, e.data.selectedPercent);
+    case 'setVariable':
+      setVariable(e.data.positionPercent, e.data.selectedPercent);
       break;
     case 'record':
       record(e.data.buffer, e.data.currentEvent);
@@ -49,35 +51,37 @@ function init(config){
   bufferLenLimit = durationLimit_s * sampleRate * 2 ;
 }
 
-function loadAudio(inputBuffer){
+function loadAudio(inputBuffer, loadedEventsList){
   var bufferL = inputBuffer[0];
   var bufferR = inputBuffer[1];
   var interleaved = interleave(bufferL, bufferR);
 
-  recBuffers = recBuffers.concat(interleaved);
+  recordBuffers = recordBuffers.concat(interleaved);
 
-  // eventsList.length = recBuffers.length;
-  eventsList[recBuffers.length - 1] = undefined;
-
-  // recBuffers.push(interleaved);
-  // recLength += interleaved.length;
+  if(loadedEventsList){
+    eventsList = loadedEventsList;
+  }else {
+    eventsList[recordBuffers.length - 1] = undefined;    
+  }
 }
 
-function insert(positionPercent, selectedPercent) {
-  var recBuffersLen = recBuffers.length;
+function setVariable(positionPercent, selectedPercentTemp) {
+  var recordBuffersLen = recordBuffers.length;
+
   // 计算新buffer数据插入的位置
-  var insertPositionTemp = Math.ceil(positionPercent * recBuffersLen);
+  var insertPositionTemp = Math.ceil(positionPercent * recordBuffersLen);
   insertPosition = (insertPositionTemp % 2 == 0) ? insertPositionTemp : insertPositionTemp - 1;
-
-  // 有选区插入时，删除已选内容
-  var deleteLen = Math.ceil(selectedPercent * recBuffersLen);
-  deleteLen = (deleteLen % 2 == 0)  ? deleteLen : deleteLen - 1;
-
-  // 从buffers删除原有数据
-  recBuffers.splice(insertPosition, deleteLen);
-
-  eventsList.splice(insertPosition, deleteLen);
-
+  selectedPercent = selectedPercentTemp;
+  
+  if(selectedPercent) {
+    // 有选区插入时，删除已选内容
+    var deleteLen = Math.ceil(selectedPercent * recordBuffersLen);
+    deleteLen = (deleteLen % 2 == 0)  ? deleteLen : deleteLen - 1;
+    
+    // 从buffers删除原有数据
+    recordBuffers.splice(insertPosition, deleteLen);
+    eventsList.splice(insertPosition, deleteLen);
+  }
 
   // 重置当前buffer长度为0
   currentBufferlenth = 0;
@@ -91,82 +95,83 @@ function record(inputBuffer, currentEvent){
 
   var interleavedOriginalLen = interleaved.length;
 
-  // debugger;
-
-  // interleaved 变换为splice的apply的参数
-  interleaved.unshift(insertPosition + currentBufferlenth, 0);
-
   // 生成事件列表数组
   var tempEventsList = [];
   // tempEventsList.length = interleavedOriginalLen;
   tempEventsList[interleavedOriginalLen - 1] = currentEvent;
-  tempEventsList.unshift(insertPosition + currentBufferlenth, 0);
 
-  // 加上处理的buffer长度，但是要减去2，因为unshift加入了两个元素
-  // currentBufferlenth += (interleaved.length - 2);
+  // 如果存在选区，则将选区内容删除(删除操作在setVariable中完成)，将新内容插入
+  // interleaved 变换为splice的apply的参数，第二个参数为0
+  // 对tempEventsList进行同样的操作
+  if(selectedPercent) {
+    interleaved.unshift(insertPosition + currentBufferlenth, 0);
+    tempEventsList.unshift(insertPosition + currentBufferlenth, 0);
+  
+  // 如果不存在选区，则将新内容逐步替换
+  // interleaved 变换为splice的apply的参数，第二个参数为本次inputBuffer的长度，即interleavedOriginalLen
+  }else {
+    // interleaved 变换为splice的apply的参数
+    // 当insertPosition在末尾时，splice删除的内容超出数组范围，故不会额外删除录制的内容
+    interleaved.unshift(insertPosition + currentBufferlenth, interleavedOriginalLen);
+    tempEventsList.unshift(insertPosition + currentBufferlenth, interleavedOriginalLen);
+  }
+
   currentBufferlenth += interleavedOriginalLen;
-  Array.prototype.splice.apply(recBuffers, interleaved);
+  Array.prototype.splice.apply(recordBuffers, interleaved);
   Array.prototype.splice.apply(eventsList, tempEventsList);
 
-  var currentDuration_s = Math.floor(recBuffers.length / 2 / sampleRate);
-  var restDuration_s = durationLimit_s - currentDuration_s
-  
+  // count restDuration_s and post message to recorder
+  var currentDuration_s = Math.floor(recordBuffers.length / 2 / sampleRate);
+  var restDuration_s = durationLimit_s - currentDuration_s  
   if(restDuration_s <= 10) {
-    var data = {
+    this.postMessage({
       command: 'durationLimit',
       restDuration_s: restDuration_s
-    }
-    this.postMessage(data);
+    });
     if(restDuration_s <= 0) {
-      // 清除多录制的少量音频数据
-      recBuffers.splice(bufferLenLimit, recBuffers.length - bufferLenLimit )
+      // 清除多录制的少量音频数据，同时清除多出的eventsList长度
+      var dLen = recordBuffers.length - bufferLenLimit;
+      recordBuffers.splice(bufferLenLimit, dLen);
+      eventsList.splice(bufferLenLimit, dLen);
       return;      
     }
   }
 }
 
 function exportWAV(type){
-  // var buffer = mergeBuffers(recBuffers, recLength);
-  var buffer = mergeBuffers(recBuffers);
+  var buffer = mergeBuffers(recordBuffers);
 
   var dataview = encodeWAV(buffer);
   var audioBlob = new Blob([dataview], { type: type });
 
-  var data = {
+  // 返回事件列表
+  this.postMessage({
     command: 'exportWAV',
     audioBlob: audioBlob,
+    unconvertEventsList: eventsList,
     eventsList: convertEventsList(eventsList),
-    samplesCount: recBuffers.length
-  }
-
-  // 返回事件列表
-  // this.postMessage(audioBlob);
-  this.postMessage(data);
+    samplesCount: recordBuffers.length
+  });
 }
 
 function getBuffer() {
-  // var buffer = mergeBuffers(recBuffers, recLength)
-  var buffer = mergeBuffers(recBuffers)
+  var buffer = mergeBuffers(recordBuffers)
 
-  this.postMessage(buffer);
+  this.postMessage({
+    command: 'getBuffer',
+    buffer: buffer
+  });
 }
 
 function clear(){
-  recLength = 0;
-  recBuffers = [];
+  recordBuffers = [];
+  eventsList = [];
 }
 
-function mergeBuffers(recBuffers){
-  // var result = new Float32Array(recLength);
-  // var offset = 0;
-  // for (var i = 0; i < recBuffers.length; i++){
-  //   result.set(recBuffers[i], offset);
-  //   offset += recBuffers[i].length;
-  // }
-  // return result;
-  var len = recBuffers.length
+function mergeBuffers(recordBuffers){
+  var len = recordBuffers.length
   var result = new Float32Array(len);
-  result.set(recBuffers, 0);
+  result.set(recordBuffers, 0);
   return result;
 }
 
@@ -239,14 +244,14 @@ function encodeWAV(samples){
 function convertEventsList(eventsList) {
   var convertedEventsList = {};
 
-  for(var e in eventsList) {
-    if(eventsList[e]) {
+  for(var e_i in eventsList) {
+    if(eventsList[e_i]) {
       // 接收的eventsList是双声道数组，所以需要除以2
       // 然后处于采样率 48000 得到秒数，再乘以1000得到毫秒
-      var ms_index = e / 2 / sampleRate * 1000;
+      var ms_index = e_i / 2 / sampleRate * 1000;
       ms_index = Math.round(ms_index);
 
-      convertedEventsList[ms_index] = eventsList[e];
+      convertedEventsList[ms_index] = eventsList[e_i];
     }
   }
   
