@@ -96,9 +96,6 @@ RecordingEditor.prototype = {
   samplesCount:      0,    // sample counts of the recorded audio
   duration:          0,
 
-  // properties in the process of playing
-  playBegin_ms: 0,
-
   // worker path for recorder's web worker
   WORKER_PATH: 'js/lib/recorder/RecorderWorker.js',
   // WORKER_PATH: 'static/js/lib/RecorderWorker.js',
@@ -355,7 +352,7 @@ RecordingEditor.prototype = {
             //   '是否保存修改？', 
             //   (result) => {
             //     if(result) {
-                  // self.hide();
+            //      // self.hide();
                   self.completeRecording();
             //     }
             //   }, 
@@ -708,6 +705,8 @@ RecordingEditor.prototype = {
         self.visualizeLoadedAMR('init');
       }else {
         self.trigger('stateChange', [{newState: 'available', triggerEvent: 'inited'}]);
+
+        self.trigger('switchFragment', [{currentSliderBarPosition_ms: 0 + self.canvasLeftOffset}]);
       }
     }else if(ctl == 'update') {
       Ps.update(audioVisualizationArea);
@@ -1016,7 +1015,7 @@ RecordingEditor.prototype = {
 
       startX = XLimit(startX);
       endX = XLimit(endX);
-      
+
       var offsetX;
       if(endX !== undefined) {
         if(startX < endX) {
@@ -1028,6 +1027,9 @@ RecordingEditor.prototype = {
         offsetX = startX;
       }  
       
+      var currentSliderBarPosition_ms = self.computeSliderBarPosition(offsetX);
+      self.trigger('switchFragment', [{currentSliderBarPosition_ms: currentSliderBarPosition_ms}]);
+
       $sliderBar.css('left', offsetX);
 
       // 改变slider-bar的位置时，更新audio-wave的beginX
@@ -1046,6 +1048,18 @@ RecordingEditor.prototype = {
       }
       return x;
     }
+  },
+
+  computeSliderBarPosition: function(left) {
+    var self = this;
+
+    var waveWidth = self.$audioWave.data('waveWidth');
+    var duration = self.$recordedAudio[0].duration;
+
+    // 如果waveWidth宽度为零，则默认为0，无法进行除法计算
+    var sliderBarPosition_ms = waveWidth ? ( left - self.canvasLeftOffset) / waveWidth * duration : 0;
+
+    return  Math.ceil(sliderBarPosition_ms * 1000);
   },
 
   // scroll the ps automaticly when the selection or sliderbar move to the edge of the visualization area
@@ -1177,6 +1191,7 @@ RecordingEditor.prototype = {
         // 录音暂停处理后/加载完成后也触发一次该事件
         if(isLoaded == true ) {
           self.trigger('stateChange', {newState: 'available', triggerEvent: 'loadedAudioProcessed'});
+          self.trigger('switchFragment', [{currentSliderBarPosition_ms: self.$audioWave.data('waveWidth')}]);
           self.trigger('stateChange', [{newState: 'available', triggerEvent: 'inited'}]);
         }else {
           self.trigger('stateChange', {newState: 'available', triggerEvent: 'recordingPaused'});          
@@ -1198,8 +1213,6 @@ RecordingEditor.prototype = {
   startRecording: function() {
     var self = this;
 
-    self.trigger('stateChange', [{newState: 'recording', triggerEvent: 'recordingStarted'}]);
-
     self.isChanged = true;
 
     var $audioWave = self.$audioWave;
@@ -1217,6 +1230,11 @@ RecordingEditor.prototype = {
     }else {
       var recordBeginX = parseInt($sliderBar.css('left')) - self.canvasLeftOffset;
     } 
+
+    var currentSliderBarPosition_ms = self.computeSliderBarPosition(recordBeginX + self.canvasLeftOffset);
+    self.trigger('switchFragment', [{currentSliderBarPosition_ms: currentSliderBarPosition_ms}]);
+    
+    self.trigger('stateChange', [{newState: 'recording', triggerEvent: 'recordingStarted'}]);
 
     var positionPercent = recordBeginX / waveWidth || 0;
     // positionPercent 存在计算误差超过1的情况，暂时使用这一hack
@@ -1329,16 +1347,19 @@ RecordingEditor.prototype = {
     }
 
     // playBeginX == playTo, start at playFrom
+    // 鉴于有暂停的存在，无论是否有变动，都刷新一下位置信息，或者在暂停处刷新亦可——钟恒
     if(playBeginX == playTo){
-        playBeginX = playFrom;
-        // set the position of slider-bar
-        $sliderBar.css('left', playFrom + self.canvasLeftOffset);
+      playBeginX = playFrom;
+      // set the position of slider-bar
+      $sliderBar.css('left', playFrom + self.canvasLeftOffset);
     }
-
     var currentTime = playBeginX / waveWidth * duration || 0;
-    self.playBegin_ms = Math.ceil(currentTime * 1000);
 
+    self.trigger('switchFragment', [{currentSliderBarPosition_ms: Math.ceil(currentTime * 1000)}]);
+    
+    // 播放事件应放在fragment切换后
     self.trigger('stateChange', [{newState: 'playing', triggerEvent: 'playingStarted'}]);
+    currentTime = playBeginX / waveWidth * duration || 0
 
     $recordedAudio[0].currentTime = currentTime;
     $recordedAudio[0].play();
@@ -1755,9 +1776,6 @@ RecordingEditor.prototype = {
     self.eventsList          = {};
     self.samplesCount        = 0;
     self.duration            = 0;
-
-    // properties in the process of playing
-    self.playBegin_ms        = 0;
   },
 
   resetRecorder: function() {
