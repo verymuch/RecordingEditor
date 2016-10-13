@@ -459,7 +459,7 @@ RecordingEditor.prototype = {
     self.$confirmNotSave = $('<div/>')
       .addClass('complete-confirm-btn not-save')
       .appendTo(self.$confirmBtns)
-      .text('放弃');
+      .text('不保存');
 
     // 确认保存按钮
     self.$confirmSave = $('<div/>')
