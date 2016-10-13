@@ -352,7 +352,7 @@ RecordingEditor.prototype = {
             //   '是否保存修改？', 
             //   (result) => {
             //     if(result) {
-            //      // self.hide();
+            //       //self.hide();
                   self.completeRecording();
             //     }
             //   }, 
@@ -460,6 +460,10 @@ RecordingEditor.prototype = {
       .addClass('no-microphone')
       .appendTo(self.$RecordingEditor)
       .html('<span>无麦克风或麦克风被禁止<br>请启动麦克风并刷新重试</span>');
+
+    self.on('switchFragment', function(e,d) {
+      console.log(d);
+    });
   },
 
   initRecorder: function() { 
@@ -706,7 +710,8 @@ RecordingEditor.prototype = {
       }else {
         self.trigger('stateChange', [{newState: 'available', triggerEvent: 'inited'}]);
 
-        self.trigger('switchFragment', [{currentSliderBarPosition_ms: 0 + self.canvasLeftOffset}]);
+        var currentSliderBarPosition_ms = self.computeSliderBarPosition(0 + self.canvasLeftOffset);
+        self.trigger('switchFragment', [{currentSliderBarPosition_ms: currentSliderBarPosition_ms}]);
       }
     }else if(ctl == 'update') {
       Ps.update(audioVisualizationArea);
@@ -846,7 +851,7 @@ RecordingEditor.prototype = {
     // offsetX/offsetY 点击位置到元素左上角的距离
     // pageX/pageY 和 clientX/clientY 为点击位置到可视区域左上角的距离
     // screenX/screenY 为点击位置到屏幕窗口左上角的距离
-    $audioWave.mousedown(function(e){
+    $audioWave.unbind('mousedown').mousedown(function(e){
       // 现有音轨宽度
       audioWaveWidth = $audioWave.data('waveWidth');
 
@@ -1017,7 +1022,7 @@ RecordingEditor.prototype = {
       endX = XLimit(endX);
 
       var offsetX;
-      if(endX !== undefined) {
+      if(endX !== undefined && endX === endX) {
         if(startX < endX) {
             offsetX = startX;
         }else {
@@ -1054,7 +1059,8 @@ RecordingEditor.prototype = {
     var self = this;
 
     var waveWidth = self.$audioWave.data('waveWidth');
-    var duration = self.$recordedAudio[0].duration;
+    // audio element duration 的计算时间存在延迟，如果当前无duration,使用self.duration
+    var duration = self.$recordedAudio[0].duration || (self.duration / 1000);
 
     // 如果waveWidth宽度为零，则默认为0，无法进行除法计算
     var sliderBarPosition_ms = waveWidth ? ( left - self.canvasLeftOffset) / waveWidth * duration : 0;
@@ -1177,6 +1183,7 @@ RecordingEditor.prototype = {
   hanldeLoadedOrRecordedAudio: function(isLoaded, blob) {
     console.log(blob,isLoaded)
     var self = this;
+
     // set existedBuffer the current recorded buffer
     var fr = new FileReader();
     fr.onload = function(e) {
@@ -1186,12 +1193,13 @@ RecordingEditor.prototype = {
         self.duration = Math.round(buffer.duration * 1000);
 
         if(self.duration > 0){
-          self.hasRecordedAudio = true;          
+          self.hasRecordedAudio = true;         
         }
         // 录音暂停处理后/加载完成后也触发一次该事件
         if(isLoaded == true ) {
           self.trigger('stateChange', {newState: 'available', triggerEvent: 'loadedAudioProcessed'});
-          self.trigger('switchFragment', [{currentSliderBarPosition_ms: self.$audioWave.data('waveWidth')}]);
+          var currentSliderBarPosition_ms = self.computeSliderBarPosition(self.$audioWave.data('waveWidth') + self.canvasLeftOffset);
+          self.trigger('switchFragment', [{currentSliderBarPosition_ms: currentSliderBarPosition_ms}]);
           self.trigger('stateChange', [{newState: 'available', triggerEvent: 'inited'}]);
         }else {
           self.trigger('stateChange', {newState: 'available', triggerEvent: 'recordingPaused'});          
@@ -1369,7 +1377,6 @@ RecordingEditor.prototype = {
     // $recordedAudio[0].addEventListener('timeupdate', function() {
     //     var currentTime = $(self)[0].currentTime;
     //     var left = currentTime / duration * waveWidth + self.canvasLeftOffset;
-    //     console.log(currentTime)
     //     $('.slider-bar').css('left', left);
     // }, false);
 
