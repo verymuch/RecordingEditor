@@ -97,6 +97,81 @@
 .recorder-ctl.record-pause:hover, .recorder-ctl.audio-pause:hover {
     background-color: rgba(231, 76, 60, .77);
 }
+/* 录音完成确认对话框 styles */
+.confirm-dialog-wrapper {
+    display: none;
+}
+.complete-confirm-dialog {
+    position: absolute;
+    top: 88px;
+    left: 170px;
+    width: 216px;
+    padding: 15px;
+    font-size: 16px;
+    background: rgba(255, 255, 255, 1);
+    border-radius: 3px;
+    transform: translate(-50%, 0);  
+    z-index: 2; 
+}
+.complete-confirm-dialog:before {
+    display: block;
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 0;
+    transform: translate(-50%, -100%);
+    border: 8px solid transparent;
+    border-bottom-color: white;
+}
+ .confirm-dialog-mask {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, .55);
+}
+.complete-confirm-dialog .complete-confirm-text {
+    margin-bottom: 15px;
+    text-align: center;
+}
+.complete-confirm-btns {
+    text-align: center;
+    color: #333;
+    font-size: 14px;
+}
+.complete-confirm-btn {
+    display: inline-block;
+    margin: 5px;
+    padding: 10px 14px;
+    border-radius: 3px;
+    border-width: 2px;
+    border-style: solid;
+    cursor: pointer;
+    line-height: 1;
+}
+.complete-confirm-btn.save {
+    border-color: #40cb90;
+    background-color: #40cb90;
+    color: white;
+}
+.complete-confirm-btn.not-save {
+    border-color: #e74c3c;
+    background-color: #e74c3c;
+    color: white;
+}
+.complete-confirm-btn.save:hover,
+.complete-confirm-btn.not-save:hover {
+    opacity: .77;
+}
+.complete-confirm-btn.cancel {
+    color: #000;
+    border-color: rgb(186, 186, 186);
+}
+.complete-confirm-btn.cancel:hover {
+    border-color: #000;
+}
 /* no microphone warning style */
 .recording-editor .no-microphone {
     display: none;

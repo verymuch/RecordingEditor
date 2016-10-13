@@ -1,5 +1,4 @@
 // import bus from 'bus'
-// import VueDialog from 'component/vue-dialog/main.js'
 
 // 以下被注释的代码应该能够解决safari上面的getUserMedia和createMediaStreamSource的问题
 // 在editor/index/record里有源码可以测试，我使用recorder.js可以顺利执行
@@ -124,7 +123,8 @@ RecordingEditor.prototype = {
       micChecked:           麦克风检测完毕时触发
       recordingStarted:     录音开始时触发
       recordingPaused:      录音暂停时触发
-      recordingCompleted:   录音完成时触发
+      recordingCompleted:   录音完成保存修改时触发
+      recordingCancelled:   录音完成但放弃修改时触发
       playingStarted:       音频播放时触发
       playingPaused:        音频播放暂停时触发
       playingEnded:         音频播放结束时触发（包括选区播放结束和非选区播放结束）
@@ -347,20 +347,30 @@ RecordingEditor.prototype = {
         self.$completeCtl
           .removeClass('waiting disabled')
           .attr({'data-balloon': '完成录音', 'data-balloon-pos': 'down'})
-          .click(function() {
-            // VueDialog.confirm(
-            //   '是否保存修改？', 
-            //   (result) => {
-            //     if(result) {
-            //       //self.hide();
-                  self.completeRecording();
-            //     }
-            //   }, 
-            //   {
-            //     posRelativeTo: self.$completeCtl[0],
-            //     pos: 'bottom'
-            //   }
-            // )
+          .click(function(e) {
+            // hide balloon
+            $(this).mouseleave();
+            self.$confirmDialogWrapper.show();
+            // 确认保存处理
+            self.$confirmSave.unbind('click').click(function() {
+              self.completeRecording(true);
+              self.$confirmDialogWrapper.hide();
+            });
+            // 确认不保存处理
+            self.$confirmNotSave.unbind('click').click(function() {
+              self.completeRecording(false);
+              self.$confirmDialogWrapper.hide();
+            });
+            // 确认取消处理
+            self.$confirmCancel.unbind('click').click(function() {
+              console.log('取消');
+              self.$confirmDialogWrapper.hide();
+            });
+            // 点击遮罩区域 返回 等于取消效果
+            self.$confirmDialogMask.unbind('click').click(function() {
+              console.log('取消');
+              self.$confirmDialogWrapper.hide();
+            });
           });
         break;
       case 'recordingCompleteProcessing':
@@ -414,6 +424,48 @@ RecordingEditor.prototype = {
       .addClass('recorder-ctl record-complete')
       .appendTo(self.$recorderCtls)
       .append($('<i/>').addClass('icon iconfont icon-ok'));
+
+    // confirm dialog wrapper
+    self.$confirmDialogWrapper = $('<div/>')
+      .addClass('confirm-dialog-wrapper')
+      .appendTo(self.$recorderCtls);
+
+    // confirm dialog mask layer
+    self.$confirmDialogMask = $('<div/>')
+      .addClass('confirm-dialog-mask')
+      .appendTo(self.$confirmDialogWrapper); 
+
+    // complete confirm dialog
+    self.$completeConfirmDialog = $('<div/>')
+      .addClass('complete-confirm-dialog')
+      .appendTo(self.$confirmDialogWrapper);
+
+    self.$confirmText = $('<div/>')
+      .addClass('complete-confirm-text')
+      .text('是否保存本次更改？')
+      .appendTo(self.$completeConfirmDialog);
+
+    self.$confirmBtns = $('<div/>')
+      .addClass('complete-confirm-btns')
+      .appendTo(self.$completeConfirmDialog);
+
+    // 确认取消按钮
+    self.$confirmCancel = $('<div/>')
+      .addClass('complete-confirm-btn cancel')
+      .appendTo(self.$confirmBtns)
+      .text('取消');
+
+    // 确认不保存按钮
+    self.$confirmNotSave = $('<div/>')
+      .addClass('complete-confirm-btn not-save')
+      .appendTo(self.$confirmBtns)
+      .text('放弃');
+
+    // 确认保存按钮
+    self.$confirmSave = $('<div/>')
+      .addClass('complete-confirm-btn save')
+      .appendTo(self.$confirmBtns)
+      .text('保存');
 
     // audio visualization area 
     self.$audioVisualizationArea = $('<div/>')
@@ -1439,17 +1491,20 @@ RecordingEditor.prototype = {
     clearInterval(self.moveSliderBarAsPlayInterval);
   },
 
-  completeRecording: function() {
+  completeRecording: function(isSave/* 是否保存修改 */) {
     var self = this;
+    if(isSave){
+      self.trigger('stateChange', [{newState: 'recordingCompleteProcessing'}]);
 
-    self.trigger('stateChange', [{newState: 'recordingCompleteProcessing'}]);
-
-    // if the recording has change do the wav2amr
-    if(self.isChanged) {
-      // wav to amr file
-      self.wav2amr();
+      // if the recording has change do the wav2amr
+      if(self.isChanged) {
+        // wav to amr file
+        self.wav2amr();
+      }else {
+        self.trigger('stateChange', [{newState: 'available', triggerEvent: 'recordingCompleted'}]);
+      }
     }else {
-      self.trigger('stateChange', [{newState: 'available', triggerEvent: 'recordingCompleted'}]);
+      self.trigger('stateChange', [{newState: 'available', triggerEvent: 'recordingCancelled'}]);
     }
 
     recorder.clear();
